@@ -1,0 +1,8 @@
+# profiles.yml
+
+jaffle_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: /workspaces/dbt-duckdb/database.duckdb
