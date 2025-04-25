@@ -1,0 +1,11 @@
+{
+	"sqltools.useNodeRuntime": true,
+	"sqltools.connections": [
+		{
+			"previewLimit": 50,
+			"driver": "DuckDB",
+			"name": "duckdb",
+			"database": "${workspaceFolder:dbt-duckdb}/database.duckdb"
+		}
+	]
+}
