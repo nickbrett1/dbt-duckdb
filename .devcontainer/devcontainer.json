@@ -4,6 +4,11 @@
 	"name": "Python 3",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
+	// Needed to work around https://github.com/microsoft/vscode-remote-release/issues/7029
+	"runArgs": [
+		"--sysctl",
+		"net.ipv6.conf.all.disable_ipv6=1"
+	],
 	"features": {
 		"ghcr.io/eitsupi/devcontainer-features/duckdb-cli:1": {}
 	},
