@@ -1,0 +1,11 @@
+sources:
+  - name: wdi_raw
+    description: "Raw data from WDI"
+    database: dev
+    tables:
+      - name: WDIfootnote
+      - name: WDICSV
+      - name: WDIcountryseries
+      - name: WDISeries
+      - name: WDICountry
+      - name: WDIseriestime
