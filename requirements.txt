@@ -22,7 +22,6 @@ cycler==0.12.1
 daff==1.3.46
 dbt-adapters==1.14.6
 dbt-common==1.23.0
-dbt-core==1.9.4
 dbt-duckdb==1.9.3
 dbt-extractor==0.6.0
 dbt-semantic-interfaces==0.7.4
