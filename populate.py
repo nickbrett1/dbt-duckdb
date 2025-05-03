@@ -1,0 +1,146 @@
+import os
+import shutil
+import tempfile
+import zipfile
+import duckdb
+import subprocess
+import psycopg2
+import argparse
+
+# This script downloads the World Bank WDI data, unzips it, and loads it into a PostgreSQL or DuckDB database.
+
+SOURCE = "https://databank.worldbank.org/data/download/WDI_CSV.zip"
+DUCKDB_DATABASE = "database.duckdb"
+POSTGRES_DB = "wdi"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "postgres"
+POSTGRES_HOST = "localhost"
+POSTGRES_PORT = 5432
+
+
+def download_file(url, dest_dir):
+    print("Downloading WDI data from World Bank using rclone...")
+    result = subprocess.run(
+        ["rclone", "copyurl", url, dest_dir, "--auto-filename", "--print-filename"],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    filename = result.stdout.strip()
+    print(f"Downloaded file: {filename}")
+    return os.path.join(dest_dir, filename)
+
+
+def unzip_file(zip_path, dest_dir):
+    print("Unzipping file...")
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(dest_dir)
+    print("Unzipped files:")
+    for file in os.listdir(dest_dir):
+        print(f" - {file}")
+
+
+def process_csv_files(temp_dir, process_function):
+    for file in os.listdir(temp_dir):
+        if file.endswith(".csv"):
+            file_path = os.path.join(temp_dir, file)
+            print(f"Processing file: {file_path}")
+            table_name = os.path.splitext(file)[0].replace("-", "")
+            process_function(file_path, table_name)
+
+
+def process_csv_duckdb(file_path, table_name):
+    query = f"""
+    CREATE TABLE IF NOT EXISTS {table_name} AS
+    SELECT * FROM read_csv_auto('{file_path}', header=True);
+    """
+    duckdb.query(query)
+
+
+def process_csv_postgres(file_path, table_name, conn):
+    cursor = conn.cursor()
+    cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+    # Dynamically create the table based on the CSV file headers
+    with open(file_path, "r") as f:
+        headers = f.readline().strip().split(",")
+        columns = ", ".join([f'"{header}" TEXT' for header in headers])
+        create_table_query = f"CREATE TABLE {table_name} ({columns})"
+        cursor.execute(create_table_query)
+
+    # Perform the COPY operation
+    with open(file_path, "r") as f:
+        cursor.copy_expert(
+            f"COPY {table_name} FROM STDIN WITH CSV HEADER",
+            f
+        )
+    print(f"Table {table_name} created and data inserted.")
+
+
+def setup_postgres_database():
+    conn = psycopg2.connect(
+        dbname="postgres",
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT
+    )
+    conn.autocommit = True
+    cursor = conn.cursor()
+
+    # Create the database if it doesn't exist
+    cursor.execute(
+        f"SELECT 1 FROM pg_database WHERE datname = '{POSTGRES_DB}'")
+    if not cursor.fetchone():
+        print(f"Database {POSTGRES_DB} does not exist. Creating it...")
+        cursor.execute(f"CREATE DATABASE {POSTGRES_DB}")
+    conn.close()
+
+    # Connect to the new database
+    return psycopg2.connect(
+        dbname=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Load WDI data into a database.")
+    parser.add_argument(
+        "--use-duckdb",
+        action="store_true",
+        help="Use DuckDB instead of PostgreSQL"
+    )
+    args = parser.parse_args()
+
+    temp_dir = tempfile.mkdtemp()
+    print(f"Temporary directory created at {temp_dir}")
+
+    try:
+        zip_file = download_file(SOURCE, temp_dir)
+        unzip_file(zip_file, temp_dir)
+
+        if args.use_duckdb:
+            if os.path.exists(DUCKDB_DATABASE):
+                print(
+                    f"Database {DUCKDB_DATABASE} already exists. Deleting it...")
+                os.remove(DUCKDB_DATABASE)
+            process_csv_files(temp_dir, process_csv_duckdb)
+        else:
+            conn = setup_postgres_database()
+            process_csv_files(temp_dir, lambda file_path, table_name: process_csv_postgres(
+                file_path, table_name, conn))
+            conn.commit()
+            conn.close()
+    finally:
+        print("Cleaning up temporary files...")
+        shutil.rmtree(temp_dir)
+        print("Temporary files cleaned up.")
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()
