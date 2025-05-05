@@ -1,7 +1,9 @@
+version: 2
+
 sources:
-  - name: wdi_raw
+  - name: wdi
     description: "Raw data from WDI"
-    database: dev
+
     tables:
       - name: WDIfootnote
       - name: WDICSV
