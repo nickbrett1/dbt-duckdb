@@ -1,5 +1,5 @@
 with source as (
-        select * from {{ source('wdi', 'WDIfootnote') }}
+        select * from {{ source('wdi_raw', 'WDIfootnote') }}
   ),
   renamed as (
       select
