@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: wdi
+    database: wdi
+    schema: public
+    description: "Raw data from WDI"
+
+    tables:
+      - name: wdifootnote
+      - name: wdicountry
+      - name: wdicsv
+      - name: wdiseriestime
+      - name: wdiseries
+      - name: wdicountryseries

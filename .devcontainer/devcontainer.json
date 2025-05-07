@@ -25,7 +25,6 @@
 				"*.md": "jinja-md"
 			},
 			"extensions": [
-				"innoverio.vscode-dbt-power-user",
 				"bastienboutonnet.vscode-dbt"
 			]
 		}
