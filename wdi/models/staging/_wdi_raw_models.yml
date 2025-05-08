@@ -1,0 +1,9 @@
+version: 2
+
+models:
+- name: stg_wdifootnote
+- name: stg_wdicountry
+- name: stg_wdicountryseries
+- name: stg_wdicsv
+- name: stg_wdiseries
+- name: stg_wdiseriestime
