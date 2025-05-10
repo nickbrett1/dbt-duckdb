@@ -25,7 +25,8 @@
 				"*.md": "jinja-md"
 			},
 			"extensions": [
-				"bastienboutonnet.vscode-dbt"
+				"bastienboutonnet.vscode-dbt",
+				"ritwickdey.LiveServer"
 			]
 		}
 	},
