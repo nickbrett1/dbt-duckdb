@@ -6,8 +6,8 @@ with
             {{ adapter.quote("Country Name") }} as country_name,
             {{ adapter.quote("Indicator Code") }} as indicator_code,
             {{ adapter.quote("Indicator Name") }} as indicator_name,
-            t.year,
-            t.value
+            cast(t.year as integer) as year,
+            cast(t.value as double precision) as value
         from source
         cross join
             lateral(
