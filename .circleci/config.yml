@@ -1,0 +1,62 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+
+      # Install rclone before installing pip modules
+      - run:
+          name: Install rclone
+          command: |
+            curl https://rclone.org/install.sh | bash
+
+      # Restore the cache of pip packages
+      - restore_cache:
+          keys:
+            - pip-cache-{{ checksum "requirements.txt" }}
+
+      # Install pip modules from requirements.txt
+      - run:
+          name: Install dependencies
+          command: pip install -r requirements.txt
+
+      # Save pip cache for subsequent runs
+      - save_cache:
+          paths:
+            - ~/.cache/pip
+          key: pip-cache-{{ checksum "requirements.txt" }}
+
+      # Download data by running the populate.py script
+      - run:
+          name: Download Data
+          command: python populate.py
+
+      # Normalize step: run dbt run and generate docs
+      - run:
+          name: Normalize data with dbt
+          command: |
+            dbt run
+            dbt docs generate
+
+  deploy:
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - run:
+          name: Deploy Application
+          command: echo "Deploying application..."
+
+workflows:
+  build_and_deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
