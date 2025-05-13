@@ -13,30 +13,30 @@ jobs:
           command: |
             curl https://rclone.org/install.sh | sudo bash
 
-      # Restore the cache of pip packages
+      # Restore the cache of pip packages based on dbt_requirements.txt
       - restore_cache:
           keys:
-            - pip-cache-{{ checksum "requirements.txt" }}
+            - pip-cache-{{ checksum "dbt_requirements.txt" }}
 
-      # Install pip modules from requirements.txt
+      # Install pip modules from dbt_requirements.txt
       - run:
           name: Install dependencies
-          command: pip install -r requirements.txt
+          command: pip install -r dbt_requirements.txt
 
       # Save pip cache for subsequent runs
       - save_cache:
           paths:
             - ~/.cache/pip
-          key: pip-cache-{{ checksum "requirements.txt" }}
+          key: pip-cache-{{ checksum "dbt_requirements.txt" }}
 
       # Download data by running the populate.py script
       - run:
           name: Download Data
-          command: python populate.py
+          command: python populate.py --use-duckdb
 
       # Normalize step: run dbt run and generate docs
       - run:
-          name: Normalize data with dbt
+          name: Normalize Data with dbt
           command: |
             dbt run
             dbt docs generate
