@@ -5,8 +5,8 @@
 name: 'wdi'
 version: '1.0.0'
 
-# This setting configures which "profile" dbt uses for this project.
-profile: 'wdi'
+# Dynamically select the dbt profile from the DBT_PROFILE environment variable, defaulting to "wdi"
+profile: "{{ env_var('DBT_PROFILE', 'wdi') }}"
 
 # These configurations specify where dbt should look for different types of files.
 # The `model-paths` config, for example, states that models in this project can be
