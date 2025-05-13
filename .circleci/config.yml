@@ -38,8 +38,7 @@ jobs:
       - run:
           name: Normalize Data with dbt
           command: |
-            dbt run
-            dbt docs generate
+            cd wdi && dbt run && dbt docs generate
 
   deploy:
     docker:
