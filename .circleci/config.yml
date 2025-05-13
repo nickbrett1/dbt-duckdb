@@ -11,7 +11,7 @@ jobs:
       - run:
           name: Install rclone
           command: |
-            curl https://rclone.org/install.sh | bash
+            sudo curl https://rclone.org/install.sh | bash
 
       # Restore the cache of pip packages
       - restore_cache:
