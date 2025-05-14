@@ -1,4 +1,5 @@
 wdi:
+  target: dev
   outputs:
     dev:
       type: postgres
@@ -9,4 +10,8 @@ wdi:
       database: wdi
       schema: dbt_nickbrett1
       threads: 4
-  target: dev
+    prod:
+      type: duckdb
+      path: ../database.duckdb
+      threads: 4
+      
