@@ -50,11 +50,24 @@ def process_csv_files(temp_dir, process_function):
 
 
 def process_csv_duckdb(file_path, table_name):
+    # Open a connection to the DuckDB file (ensuring data is persisted to disk)
+    con = duckdb.connect(DUCKDB_DATABASE)
+
     query = f"""
     CREATE TABLE IF NOT EXISTS {table_name} AS
     SELECT * FROM read_csv_auto('{file_path}', header=True);
     """
-    duckdb.query(query)
+    con.execute(query)
+
+    # Perform error checking by verifying the table contains data.
+    count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+    if count == 0:
+        print(f"Error: No data was inserted into table {table_name}.")
+    else:
+        print(f"Table {table_name} successfully populated with {count} rows.")
+
+    # Close the connection to ensure changes are saved to disk.
+    con.close()
 
 
 def process_csv_postgres(file_path, table_name, conn):
