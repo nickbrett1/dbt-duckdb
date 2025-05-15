@@ -130,6 +130,7 @@ def main():
                     f"Database {DUCKDB_DATABASE} already exists. Deleting it...")
                 os.remove(DUCKDB_DATABASE)
             process_csv_files(temp_dir, process_csv_duckdb)
+            print("DuckDB database population successful.")
         else:
             conn = setup_postgres_database()
             process_csv_files(temp_dir, lambda file_path, table_name: process_csv_postgres(
