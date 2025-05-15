@@ -12,6 +12,6 @@ wdi:
       threads: 4
     prod:
       type: duckdb
-      path: ../database.duckdb
+      path: ../wdi.duckdb
       threads: 4
       

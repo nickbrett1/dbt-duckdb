@@ -10,12 +10,13 @@ import argparse
 # This script downloads the World Bank WDI data, unzips it, and loads it into a PostgreSQL or DuckDB database.
 
 SOURCE = "https://databank.worldbank.org/data/download/WDI_CSV.zip"
-DUCKDB_DATABASE = "database.duckdb"
 POSTGRES_DB = "wdi"
 POSTGRES_USER = "postgres"
 POSTGRES_PASSWORD = "postgres"
 POSTGRES_HOST = "localhost"
 POSTGRES_PORT = 5432
+# Align the names to not require conditionals in the dbt code
+DUCKDB_DATABASE = f"{POSTGRES_DB}.duckdb"
 
 
 def download_file(url, dest_dir):
@@ -53,18 +54,23 @@ def process_csv_duckdb(file_path, table_name):
     # Open a connection to the DuckDB file (ensuring data is persisted to disk)
     con = duckdb.connect(DUCKDB_DATABASE)
 
+    # Create the 'public' schema if it doesn't exist
+    con.execute("CREATE SCHEMA IF NOT EXISTS public")
+
     query = f"""
-    CREATE TABLE IF NOT EXISTS {table_name} AS
+    CREATE TABLE IF NOT EXISTS public.{table_name} AS
     SELECT * FROM read_csv_auto('{file_path}', header=True);
     """
     con.execute(query)
 
     # Perform error checking by verifying the table contains data.
-    count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+    count = con.execute(
+        f"SELECT COUNT(*) FROM public.{table_name}").fetchone()[0]
     if count == 0:
-        print(f"Error: No data was inserted into table {table_name}.")
+        print(f"Error: No data was inserted into table public.{table_name}.")
     else:
-        print(f"Table {table_name} successfully populated with {count} rows.")
+        print(
+            f"Table public.{table_name} successfully populated with {count} rows.")
 
     # Close the connection to ensure changes are saved to disk.
     con.close()
