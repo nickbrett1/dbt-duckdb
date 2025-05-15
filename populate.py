@@ -62,18 +62,18 @@ def process_csv_postgres(file_path, table_name, conn):
     cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
 
     # Dynamically create the table based on the CSV file headers
-    with open(file_path, "r") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         headers = f.readline().strip().split(",")
         columns = ", ".join([f'"{header}" TEXT' for header in headers])
         create_table_query = f"CREATE TABLE {table_name} ({columns})"
         cursor.execute(create_table_query)
 
-    # Perform the COPY operation
-    with open(file_path, "r") as f:
+    # Perform the COPY operation using UTF-8 encoding
+    with open(file_path, "r", encoding="utf-8") as f:
         cursor.copy_expert(
-            f"COPY {table_name} FROM STDIN WITH CSV HEADER",
-            f
+            f"COPY {table_name} FROM STDIN WITH CSV HEADER ENCODING 'UTF8'", f
         )
+    conn.commit()
     print(f"Table {table_name} created and data inserted.")
 
 
@@ -93,7 +93,8 @@ def setup_postgres_database():
         f"SELECT 1 FROM pg_database WHERE datname = '{POSTGRES_DB}'")
     if not cursor.fetchone():
         print(f"Database {POSTGRES_DB} does not exist. Creating it...")
-        cursor.execute(f"CREATE DATABASE {POSTGRES_DB}")
+        cursor.execute(
+            f"CREATE DATABASE {POSTGRES_DB} WITH ENCODING 'UTF8' TEMPLATE template0;")
     conn.close()
 
     # Connect to the new database
