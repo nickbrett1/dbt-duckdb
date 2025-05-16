@@ -94,3 +94,62 @@ models:
                 - "2022"
                 - "2023"
                 - "2024"
+      - name: value
+        description: "Indicator value for the given year."
+        tests:
+          - not_null
+          - numeric
+
+  - name: dim_country
+    description: "Dimensional table for country metadata, sourced from stg_wdicountry."
+    columns:
+      - name: country_code
+        description: "ISO country code (three-letter)."
+        tests:
+          - not_null
+          - unique
+      - name: country_name
+        description: "Full country name."
+        tests:
+          - not_null
+      - name: region
+        description: "Geographical region."
+      - name: income_group
+        description: "Income group classification."
+      - name: currency_unit
+        description: "Currency unit used."
+      - name: short_name
+        description: "Country short name."
+      - name: long_name
+        description: "Country long name."
+
+  - name: dim_indicator
+    description: "Dimensional table for indicator metadata, derived from stg_wdicsv."
+    columns:
+      - name: indicator_code
+        description: "Unique indicator code."
+        tests:
+          - not_null
+          - unique
+      - name: indicator_name
+        description: "Indicator name."
+        tests:
+          - not_null
+
+  - name: fct_country_summary
+    description: "Fact table summarising per-country indicator changes from 1960 to 2024."
+    columns:
+      - name: country_code
+        description: "Country code linking to dim_country."
+        tests:
+          - not_null
+      - name: country_name
+        description: "Country name."
+        tests:
+          - not_null
+      - name: num_indicators
+        description: "Count of indicators used for the summary."
+      - name: avg_indicator_change
+        description: "Average change in indicator values between 1960 and 2024."
+      - name: total_indicator_change
+        description: "Aggregate change in indicator values between 1960 and 2024."
