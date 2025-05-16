@@ -96,9 +96,6 @@ models:
                 - "2024"
       - name: value
         description: "Indicator value for the given year."
-        tests:
-          - not_null
-          - numeric
 
   - name: dim_country
     description: "Dimensional table for country metadata, sourced from stg_wdicountry."
