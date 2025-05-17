@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-# filepath: /workspaces/dbt-duckdb/duckdb2sqlite_and_dump.py
+# filepath: /workspaces/dbt-duckdb/duckdb2sqlite.py
 
 import duckdb
 import sqlite3
 import subprocess
 import os
 import re
+import argparse
 
 
 def map_type(duck_type: str) -> str:
@@ -65,6 +66,8 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str):
     tables = duck_conn.execute("SHOW TABLES;").fetchall()
     if not tables:
         print("No tables found in DuckDB.")
+        duck_conn.close()
+        sqlite_conn.close()
         return
 
     print("Exporting tables from DuckDB to SQLite:")
@@ -92,6 +95,7 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str):
     skip_kv_block = False
     total_lines = 0
     skipped_lines = 0
+    kv_pattern = re.compile(r'^CREATE TABLE _cf_KV ')
 
     for line in dump_text.splitlines():
         total_lines += 1
@@ -101,10 +105,11 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str):
             continue
 
         # Check if line begins the _cf_KV table block.
-        if re.match(r'^CREATE TABLE _cf_KV ', line):
+        if kv_pattern.match(line):
             skip_kv_block = True
             skipped_lines += 1
             continue
+
         # If we are in _cf_KV block, skip until we get to a line that ends with "WITHOUT ROWID;"
         if skip_kv_block:
             skipped_lines += 1
@@ -120,20 +125,25 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str):
 
     with open(output_sql_filename, "w", encoding="utf-8") as f:
         f.write(cleaned_dump)
-
     print(f"Cleaned SQL dump is written to {output_sql_filename}")
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Export DuckDB to SQLite and/or dump and clean SQLite SQL statements.")
+    parser.add_argument("--mode", choices=["all", "export", "dump"], default="all",
+                        help="Mode to run: 'all' runs both export and dump; 'export' runs only export; 'dump' runs only dump (requires SQLite file).")
+    args = parser.parse_args()
+
     duckdb_filename = "wdi.duckdb"
     sqlite_filename = "wdi.sqlite3"
     output_sql_filename = "cleaned_dump.sql"
 
-    # Step 1: Export DuckDB tables to SQLite.
-    export_duckdb_to_sqlite(duckdb_filename, sqlite_filename)
+    if args.mode in ("export", "all"):
+        export_duckdb_to_sqlite(duckdb_filename, sqlite_filename)
 
-    # Step 2: Dump SQLite database to SQL statements and clean the dump.
-    dump_and_clean_sqlite(sqlite_filename, output_sql_filename)
+    if args.mode in ("dump", "all"):
+        dump_and_clean_sqlite(sqlite_filename, output_sql_filename)
 
 
 if __name__ == '__main__':

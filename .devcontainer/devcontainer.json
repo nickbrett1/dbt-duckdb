@@ -9,6 +9,12 @@
 		"--sysctl",
 		"net.ipv6.conf.all.disable_ipv6=1"
 	],
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// 5432 is the default port for PostgreSQL.
+	"forwardPorts": [
+		5432
+	],
+	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
 		"ghcr.io/eitsupi/devcontainer-features/duckdb-cli:1": {},
 		"ghcr.io/itsmechlark/features/postgresql:1": {
@@ -32,10 +38,6 @@
 			]
 		}
 	},
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "sudo bash .devcontainer/setup-postgres.sh && pip install --upgrade pip && pip install dbt-core && pip3 install --user -r requirements.txt"
 	// Configure tool-specific properties.
