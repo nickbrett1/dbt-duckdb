@@ -14,7 +14,8 @@
 		"ghcr.io/itsmechlark/features/postgresql:1": {
 			"version": "latest"
 		},
-		"ghcr.io/devcontainers-extra/features/rclone:1": {}
+		"ghcr.io/devcontainers-extra/features/rclone:1": {},
+		"ghcr.io/warrenbuckley/codespace-features/sqlite:latest": {}
 	},
 	"customizations": {
 		"vscode": {

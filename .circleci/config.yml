@@ -13,6 +13,12 @@ jobs:
           command: |
             curl https://rclone.org/install.sh | sudo bash
 
+      # Install sqlite3
+      - run:
+          name: Install sqlite3
+          command: |
+            sudo apt-get update && sudo apt-get install -y sqlite3
+
       # Restore the cache of pip packages based on dbt_requirements.txt
       - restore_cache:
           keys:

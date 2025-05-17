@@ -1,5 +1,7 @@
 logs/
 database.duckdb
 wdi.duckdb
+wdi.sqlite3
+wdi.sql
 .user.yml
 *_profile.html
