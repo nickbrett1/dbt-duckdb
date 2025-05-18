@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # filepath: /workspaces/dbt-duckdb/duckdb2sqlite.py
 
+import os
 import duckdb
 import sqlite3
 import subprocess
-import os
 import re
 import argparse
 
@@ -27,7 +27,6 @@ def map_type(duck_type: str) -> str:
 
 def export_table(duck_conn, sqlite_conn, table_name: str):
     # Get table structure from DuckDB using DESCRIBE.
-    # This returns rows: [column_name, type, ...]
     columns_info = duck_conn.execute(f"DESCRIBE {table_name}").fetchall()
     if not columns_info:
         print(f"Warning: No column info for table {table_name}")
@@ -56,13 +55,17 @@ def export_table(duck_conn, sqlite_conn, table_name: str):
 
 
 def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str):
-    # Connect to DuckDB (persistent file).
-    duck_conn = duckdb.connect(duckdb_filename)
+    # Remove existing SQLite file if it exists.
+    if os.path.exists(sqlite_filename):
+        print(f"Overwriting existing {sqlite_filename} file.")
+        os.remove(sqlite_filename)
+
+    # Connect to DuckDB (persistent file) in read-only mode.
+    duck_conn = duckdb.connect(duckdb_filename, read_only=True)
     # Connect to SQLite.
     sqlite_conn = sqlite3.connect(sqlite_filename)
 
     # Get all tables from DuckDB.
-    # This returns a list of tuples, e.g. [('table1',), ('table2',), ...]
     tables = duck_conn.execute("SHOW TABLES;").fetchall()
     if not tables:
         print("No tables found in DuckDB.")
@@ -70,11 +73,17 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str):
         sqlite_conn.close()
         return
 
-    print("Exporting tables from DuckDB to SQLite:")
+    # Only export marts tables. Adjust prefixes as needed.
+    mart_prefixes = ("fct_", "dim_")
+    print("Exporting marts tables from DuckDB to SQLite:")
     for table in tables:
         table_name = table[0]
-        print(f" * Exporting table: {table_name}")
-        export_table(duck_conn, sqlite_conn, table_name)
+        # Export only if the table name starts with one of the mart prefixes.
+        if table_name.startswith(mart_prefixes):
+            print(f" * Exporting table: {table_name}")
+            export_table(duck_conn, sqlite_conn, table_name)
+        else:
+            print(f" - Skipping non-mart table: {table_name}")
 
     duck_conn.close()
     sqlite_conn.close()
@@ -83,14 +92,12 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str):
 
 def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str):
     print(f"Dumping SQLite database '{sqlite_filename}' to SQL statements...")
-    # Dump the entire SQLite database to SQL statements using .dump command.
     dump_cmd = f'sqlite3 {sqlite_filename} .dump'
     result = subprocess.run(dump_cmd, shell=True,
                             capture_output=True, text=True, check=True)
     dump_text = result.stdout
     print("Dump complete. Starting to clean the dump...")
 
-    # Remove BEGIN TRANSACTION and COMMIT lines.
     cleaned_lines = []
     skip_kv_block = False
     total_lines = 0
@@ -130,14 +137,15 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export DuckDB to SQLite and/or dump and clean SQLite SQL statements.")
+        description="Export DuckDB to SQLite and/or dump and clean SQLite SQL statements."
+    )
     parser.add_argument("--mode", choices=["all", "export", "dump"], default="all",
                         help="Mode to run: 'all' runs both export and dump; 'export' runs only export; 'dump' runs only dump (requires SQLite file).")
     args = parser.parse_args()
 
     duckdb_filename = "wdi.duckdb"
     sqlite_filename = "wdi.sqlite3"
-    output_sql_filename = "cleaned_dump.sql"
+    output_sql_filename = "wdi.sql"
 
     if args.mode in ("export", "all"):
         export_duckdb_to_sqlite(duckdb_filename, sqlite_filename)
