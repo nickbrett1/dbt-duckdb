@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# filepath: /workspaces/dbt-duckdb/populate.py
 import os
 import shutil
 import tempfile
@@ -18,6 +20,9 @@ POSTGRES_PORT = 5432
 # Align the names to not require conditionals in the dbt code
 DUCKDB_DATABASE = f"{POSTGRES_DB}.duckdb"
 
+# Configure your Cloudflare R2 bucket remote (ensure rclone is configured accordingly)
+R2_BUCKET = "r2:mybucket/wdi_data"
+
 
 def download_file(url, dest_dir):
     print("Downloading WDI data from World Bank using rclone...")
@@ -30,6 +35,21 @@ def download_file(url, dest_dir):
     filename = result.stdout.strip()
     print(f"Downloaded file: {filename}")
     return os.path.join(dest_dir, filename)
+
+
+def sync_to_r2(zip_path):
+    # Check if the remote already has the same file.
+    print("Checking if data is new by comparing with Cloudflare R2 bucket...")
+    check_cmd = ["rclone", "check", zip_path, R2_BUCKET]
+    result = subprocess.run(check_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        print("Data has not changed on Cloudflare R2 bucket. Skipping further processing.")
+        return False
+    else:
+        print("New data detected. Syncing file to Cloudflare R2 bucket...")
+        copy_cmd = ["rclone", "copy", zip_path, R2_BUCKET, "--checksum"]
+        subprocess.run(copy_cmd, check=True)
+        return True
 
 
 def unzip_file(zip_path, dest_dir):
@@ -141,6 +161,11 @@ def main():
 
     try:
         zip_file = download_file(SOURCE, temp_dir)
+        # Sync to Cloudflare R2 and check if data is new
+        if not sync_to_r2(zip_file):
+            # Output already provided from sync_to_r2, exiting.
+            return
+
         unzip_file(zip_file, temp_dir)
 
         if args.use_duckdb:
