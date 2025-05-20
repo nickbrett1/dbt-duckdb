@@ -15,9 +15,10 @@ R2_BUCKET_WDI = "r2:wdi"
 
 
 def download_file(url, dest_dir):
-    print(f"Downloading WDI data from {url} using rclone...")
+    print(f"Downloading WDI data from {url} using rclone via Doppler...")
     result = subprocess.run(
-        ["rclone", "copyurl", url, dest_dir, "--auto-filename", "--print-filename"],
+        ["doppler", "run", "--", "rclone", "copyurl", url,
+            dest_dir, "--auto-filename", "--print-filename"],
         capture_output=True,
         text=True,
         check=True
@@ -30,7 +31,8 @@ def download_file(url, dest_dir):
 def sync_to_r2(local_path, r2_bucket):
     print(
         f"Checking if {os.path.basename(local_path)} is new by comparing with {r2_bucket}...")
-    check_cmd = ["rclone", "check", local_path, r2_bucket]
+    check_cmd = ["doppler", "run", "--",
+                 "rclone", "check", local_path, r2_bucket]
     result = subprocess.run(check_cmd, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"{os.path.basename(local_path)} has not changed on {r2_bucket}.")
@@ -38,7 +40,8 @@ def sync_to_r2(local_path, r2_bucket):
     else:
         print(
             f"New data detected for {os.path.basename(local_path)}. Syncing to {r2_bucket}...")
-        copy_cmd = ["rclone", "copy", local_path, r2_bucket, "--checksum"]
+        copy_cmd = ["doppler", "run", "--", "rclone",
+                    "copy", local_path, r2_bucket, "--checksum"]
         subprocess.run(copy_cmd, check=True)
         return True
 
@@ -74,7 +77,7 @@ def process_wdi_data(raw_zip, work_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download WDI data, convert CSV files to Parquet, and sync to Cloudflare R2."
+        description="Download WDI data, convert CSV files to Parquet, and sync to Cloudflare R2 using Doppler."
     )
     args = parser.parse_args()
 

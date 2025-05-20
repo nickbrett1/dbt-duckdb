@@ -5,5 +5,4 @@ wdi.sqlite3
 wdi.sql
 .user.yml
 *_profile.html
-rclone.conf
 node_modules/
