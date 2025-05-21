@@ -11,7 +11,7 @@ import shutil
 POPULATION_SERVICE_URL = "http://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL?format=json&date=2022"
 
 # Cloudflare R2 bucket destination for population data (stored as Parquet)
-R2_BUCKET_POP = "r2:mybucket/population_data"
+R2_BUCKET_POP = "r2:wdi"
 
 
 def fetch_population_data():
@@ -20,6 +20,7 @@ def fetch_population_data():
         response = requests.get(POPULATION_SERVICE_URL)
         response.raise_for_status()
         data = response.json()
+        # The API returns two elements, where the second includes the records.
         records = data[1] if len(data) > 1 else []
         if not records:
             print("Warning: Population data is empty.")
@@ -49,7 +50,8 @@ def save_population_parquet(pop_list, dest_file):
 def sync_to_r2(local_path, r2_bucket):
     print(
         f"Checking if {os.path.basename(local_path)} is new by comparing with {r2_bucket}...")
-    check_cmd = ["rclone", "check", local_path, r2_bucket]
+    check_cmd = ["doppler", "run", "--",
+                 "rclone", "check", local_path, r2_bucket]
     result = subprocess.run(check_cmd, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"{os.path.basename(local_path)} has not changed on {r2_bucket}.")
@@ -57,15 +59,17 @@ def sync_to_r2(local_path, r2_bucket):
     else:
         print(
             f"New data detected for {os.path.basename(local_path)}. Syncing to {r2_bucket}...")
-        copy_cmd = ["rclone", "copy", local_path, r2_bucket, "--checksum"]
+        copy_cmd = ["doppler", "run", "--", "rclone",
+                    "copy", local_path, r2_bucket, "--checksum"]
         subprocess.run(copy_cmd, check=True)
         return True
 
 
 def main():
-    argparse.ArgumentParser(
-        description="Fetch population data from the World Bank API, store as Parquet, and sync to Cloudflare R2."
+    parser = argparse.ArgumentParser(
+        description="Fetch population data from the World Bank API, store as Parquet, and sync to Cloudflare R2 using Doppler."
     )
+    parser.parse_args()
 
     temp_dir = tempfile.mkdtemp()
     print(f"Temporary directory: {temp_dir}")
