@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 # Constants for processing
 # These will be the local mirror copies from the R2 bucket.
 # Contains Parquet files for each table of WDI data
-R2_BUCKET_WDI = "r2:mybucket/wdi_data"
+R2_BUCKET_WDI = "r2:wdi"
 
 POSTGRES_DB = "wdi"
 POSTGRES_USER = "postgres"

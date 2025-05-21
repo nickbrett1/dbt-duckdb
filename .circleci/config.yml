@@ -1,67 +1,116 @@
 version: 2.1
 
 jobs:
-  build:
+  download_population:
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
 
-      # Install rclone before installing pip modules
+      # Install rclone via curl
       - run:
           name: Install rclone
           command: |
             curl https://rclone.org/install.sh | sudo bash
 
-      # Install sqlite3
-      - run:
-          name: Install sqlite3
-          command: |
-            sudo apt-get update && sudo apt-get install -y sqlite3
-
-      # Restore the cache of pip packages based on requirements.txt
+      # Restore pip cache
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
 
       # Install pip modules from requirements.txt
       - run:
-          name: Install dependencies
+          name: Install pip modules
           command: pip install -r requirements.txt
 
-      # Save pip cache for subsequent runs
+      # Save pip cache for subsequent builds
       - save_cache:
           paths:
             - ~/.cache/pip
           key: pip-cache-{{ checksum "requirements.txt" }}
 
-      # Download data by running the populate.py script
+      # Run the population download script
       - run:
-          name: Download Data
-          command: python populate.py --use-duckdb
+          name: Download Population Data
+          command: python download_population.py
 
-      # Normalize step: run dbt run and generate docs
-      - run:
-          name: Normalize Data with dbt
-          command: |
-            cd wdi && dbt deps && dbt run --target prod && dbt docs generate --target prod
-
-  deploy:
+  download_wdi:
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
+
+      # Install rclone
       - run:
-          name: Deploy Application
-          command: echo "Deploying application..."
+          name: Install rclone
+          command: |
+            curl https://rclone.org/install.sh | sudo bash
+
+      # Restore pip cache
+      - restore_cache:
+          keys:
+            - pip-cache-{{ checksum "requirements.txt" }}
+
+      # Install pip modules
+      - run:
+          name: Install pip modules
+          command: pip install -r requirements.txt
+
+      # Save pip cache
+      - save_cache:
+          paths:
+            - ~/.cache/pip
+          key: pip-cache-{{ checksum "requirements.txt" }}
+
+      # Run the WDI download script
+      - run:
+          name: Download WDI Data
+          command: python download_wdi.py
+
+  populate:
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+
+      # Install rclone
+      - run:
+          name: Install rclone
+          command: |
+            curl https://rclone.org/install.sh | sudo bash
+
+      # Install sqlite3 (or other dependencies as needed)
+      - run:
+          name: Install sqlite3
+          command: sudo apt-get update && sudo apt-get install -y sqlite3
+
+      # Restore pip cache
+      - restore_cache:
+          keys:
+            - pip-cache-{{ checksum "requirements.txt" }}
+
+      # Install pip modules
+      - run:
+          name: Install pip modules
+          command: pip install -r requirements.txt
+
+      # Save pip cache
+      - save_cache:
+          paths:
+            - ~/.cache/pip
+          key: pip-cache-{{ checksum "requirements.txt" }}
+
+      # Run the populate script (which reads from Cloudflare R2)
+      - run:
+          name: Populate Databases
+          command: python populate.py --use-duckdb
 
 workflows:
-  build_and_deploy:
+  build_and_populate:
     jobs:
-      - build
-      - deploy:
+      - download_population
+      - download_wdi
+      - populate:
           requires:
-            - build
-          filters:
-            branches:
-              only: main
+            - download_population
+            - download_wdi
