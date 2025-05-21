@@ -19,21 +19,21 @@ jobs:
           command: |
             sudo apt-get update && sudo apt-get install -y sqlite3
 
-      # Restore the cache of pip packages based on dbt_requirements.txt
+      # Restore the cache of pip packages based on requirements.txt
       - restore_cache:
           keys:
-            - pip-cache-{{ checksum "dbt_requirements.txt" }}
+            - pip-cache-{{ checksum "requirements.txt" }}
 
-      # Install pip modules from dbt_requirements.txt
+      # Install pip modules from requirements.txt
       - run:
           name: Install dependencies
-          command: pip install -r dbt_requirements.txt
+          command: pip install -r requirements.txt
 
       # Save pip cache for subsequent runs
       - save_cache:
           paths:
             - ~/.cache/pip
-          key: pip-cache-{{ checksum "dbt_requirements.txt" }}
+          key: pip-cache-{{ checksum "requirements.txt" }}
 
       # Download data by running the populate.py script
       - run:
