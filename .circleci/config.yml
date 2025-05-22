@@ -67,7 +67,7 @@ jobs:
           name: Download WDI Data
           command: python download_wdi.py
 
-  populate:
+  transform:
     docker:
       - image: cimg/python:3.13
     steps:
@@ -105,12 +105,22 @@ jobs:
           name: Populate Databases
           command: python populate.py --use-duckdb
 
+      # Run dbt run
+      - run:
+          name: Run dbt run
+          command: dbt run
+
+      # Generate dbt docs
+      - run:
+          name: Generate dbt docs
+          command: dbt docs generate
+
 workflows:
-  build_and_populate:
+  download_transform_and_load:
     jobs:
       - download_population
       - download_wdi
-      - populate:
+      - transform:
           requires:
             - download_population
             - download_wdi
