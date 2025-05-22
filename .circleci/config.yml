@@ -118,7 +118,7 @@ jobs:
           name: Run dbt run
           command: |
             pushd wdi
-            dbt run
+            dbt run --target prod
             popd
 
       # Generate dbt docs inside the wdi directory
