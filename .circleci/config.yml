@@ -108,12 +108,18 @@ jobs:
       # Run dbt run
       - run:
           name: Run dbt run
-          command: dbt run
+          command: |
+            pushd wdi
+            dbt run
+            popd
 
       # Generate dbt docs
       - run:
           name: Generate dbt docs
-          command: dbt docs generate
+          command: |
+            pushd wdi
+            dbt docs generate
+            popd
 
   load:
     docker:
