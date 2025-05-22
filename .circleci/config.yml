@@ -79,11 +79,6 @@ jobs:
           command: |
             curl https://rclone.org/install.sh | sudo bash
 
-      # Install sqlite3 (or other dependencies as needed)
-      - run:
-          name: Install sqlite3
-          command: sudo apt-get update && sudo apt-get install -y sqlite3
-
       # Restore pip cache
       - restore_cache:
           keys:
@@ -142,6 +137,10 @@ jobs:
       # Attach the workspace so that wdi.duckdb is available
       - attach_workspace:
           at: .
+      # Install sqlite3 so that the sqlite3 command is available
+      - run:
+          name: Install sqlite3
+          command: sudo apt-get update && sudo apt-get install -y sqlite3
       # Restore and install pip cache/modules steps here...
       - restore_cache:
           keys:
