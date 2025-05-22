@@ -105,7 +105,15 @@ jobs:
           name: Populate Databases
           command: python populate.py --use-duckdb
 
-      # Run dbt run
+      # Run dbt deps inside the wdi directory
+      - run:
+          name: Run dbt deps
+          command: |
+            pushd wdi
+            dbt deps
+            popd
+
+      # Run dbt run inside the wdi directory
       - run:
           name: Run dbt run
           command: |
@@ -113,7 +121,7 @@ jobs:
             dbt run
             popd
 
-      # Generate dbt docs
+      # Generate dbt docs inside the wdi directory
       - run:
           name: Generate dbt docs
           command: |
