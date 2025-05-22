@@ -128,30 +128,32 @@ jobs:
             pushd wdi
             dbt docs generate --target prod
             popd
+      # Persist the wdi.duckdb file to the workspace
+      - persist_to_workspace:
+          root: .
+          paths:
+            - wdi.duckdb
 
   load:
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
-
-      # Restore pip cache
+      # Attach the workspace so that wdi.duckdb is available
+      - attach_workspace:
+          at: .
+      # Restore and install pip cache/modules steps here...
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
-
-      # Install pip modules (if duckdb2sqlite.py has dependencies listed in requirements.txt)
       - run:
           name: Install pip modules
           command: pip install -r requirements.txt
-
-      # Save pip cache
       - save_cache:
           paths:
             - ~/.cache/pip
           key: pip-cache-{{ checksum "requirements.txt" }}
-
-      # Run the DuckDB to SQLite export script
+      # Now run the DuckDB to SQLite export script, which can use wdi.duckdb
       - run:
           name: Export DuckDB to SQLite
           command: python duckdb2sqlite.py
