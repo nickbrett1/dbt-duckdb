@@ -126,7 +126,7 @@ jobs:
           name: Generate dbt docs
           command: |
             pushd wdi
-            dbt docs generate
+            dbt docs generate --target prod
             popd
 
   load:
