@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  doppler: conpago/doppler@1.3.5
-
 jobs:
   download_population:
     docker:
@@ -15,9 +12,6 @@ jobs:
           name: Install rclone
           command: |
             curl https://rclone.org/install.sh | sudo bash
-
-      # Install dopppler
-      - doppler/install
 
       # Restore pip cache
       - restore_cache:
@@ -52,9 +46,6 @@ jobs:
           command: |
             curl https://rclone.org/install.sh | sudo bash
 
-      # Install dopppler
-      - doppler/install
-
       # Restore pip cache
       - restore_cache:
           keys:
@@ -87,9 +78,6 @@ jobs:
           name: Install rclone
           command: |
             curl https://rclone.org/install.sh | sudo bash
-
-      # Install dopppler
-      - doppler/install
 
       # Install sqlite3 (or other dependencies as needed)
       - run:

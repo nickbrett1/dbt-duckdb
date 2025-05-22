@@ -1,5 +1,11 @@
 {
-  "devDependencies": {
-    "wrangler": "^4.15.2"
-  }
+  "name": "dbt-duckdb",
+  "version": "1.0.0",
+  "scripts": {
+    "populate:duckdb": "doppler run -- python populate.py --use-duckdb",
+    "populate:postgres": "doppler run -- python populate.py --use-postgres",
+    "download:population": "doppler run -- python download_population.py",
+    "download:wdi": "doppler run -- python download_wdi.py"
+  },
+  "dependencies": {}
 }

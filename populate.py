@@ -80,7 +80,14 @@ def main():
     )
     parser.add_argument("--use-duckdb", action="store_true",
                         help="Use DuckDB instead of PostgreSQL")
+    parser.add_argument("--use-postgres", action="store_true",
+                        help="Populate PostgreSQL (instead of DuckDB)")
     args = parser.parse_args()
+
+    # Validate that exactly one flag is provided.
+    if args.use_duckdb == args.use_postgres:
+        print("Error: Please specify either --use-duckdb or --use-postgres (but not both).")
+        exit(1)
 
     temp_dir = tempfile.mkdtemp()
     print(f"Temporary directory created at {temp_dir}")
@@ -102,7 +109,7 @@ def main():
                     table_name = os.path.splitext(file)[0].replace("-", "")
                     process_parquet_duckdb(parquet_path, table_name)
                 print("DuckDB population complete.")
-            else:
+            elif args.use_postgres:
                 engine = setup_postgres_engine()
                 for file in parquet_files:
                     parquet_path = os.path.join(temp_dir, file)

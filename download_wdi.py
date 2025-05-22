@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# filepath: /workspaces/dbt-duckdb/download_wdi.py
 import os
 import subprocess
 import tempfile
@@ -10,15 +11,15 @@ import shutil
 # Constants for downloading WDI data
 SOURCE = "https://databank.worldbank.org/data/download/WDI_CSV.zip"
 
-# Cloudflare R2 bucket destination for WDI data (raw ZIP and Parquet files)
+# Cloudflare R2 bucket destination for WDI data.
+# Parquet files are saved in the bucket root, while the raw ZIP is saved in the "raw" folder.
 R2_BUCKET_WDI = "r2:wdi"
 
 
 def download_file(url, dest_dir):
-    print(f"Downloading WDI data from {url} using rclone via Doppler...")
+    print(f"Downloading WDI data from {url} using rclone...")
     result = subprocess.run(
-        ["doppler", "run", "--", "rclone", "copyurl", url,
-            dest_dir, "--auto-filename", "--print-filename"],
+        ["rclone", "copyurl", url, dest_dir, "--auto-filename", "--print-filename"],
         capture_output=True,
         text=True,
         check=True
@@ -31,8 +32,7 @@ def download_file(url, dest_dir):
 def sync_to_r2(local_path, r2_bucket):
     print(
         f"Checking if {os.path.basename(local_path)} is new by comparing with {r2_bucket}...")
-    check_cmd = ["doppler", "run", "--",
-                 "rclone", "check", local_path, r2_bucket]
+    check_cmd = ["rclone", "check", local_path, r2_bucket]
     result = subprocess.run(check_cmd, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"{os.path.basename(local_path)} has not changed on {r2_bucket}.")
@@ -40,8 +40,7 @@ def sync_to_r2(local_path, r2_bucket):
     else:
         print(
             f"New data detected for {os.path.basename(local_path)}. Syncing to {r2_bucket}...")
-        copy_cmd = ["doppler", "run", "--", "rclone",
-                    "copy", local_path, r2_bucket, "--checksum"]
+        copy_cmd = ["rclone", "copy", local_path, r2_bucket, "--checksum"]
         subprocess.run(copy_cmd, check=True)
         return True
 
@@ -77,7 +76,7 @@ def process_wdi_data(raw_zip, work_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download WDI data, convert CSV files to Parquet, and sync to Cloudflare R2 using Doppler."
+        description="Download WDI data, convert CSV files to Parquet, and sync to Cloudflare R2."
     )
     args = parser.parse_args()
 
@@ -85,11 +84,13 @@ def main():
     print(f"Temporary directory: {temp_dir}")
     try:
         raw_zip = download_file(SOURCE, temp_dir)
-        sync_to_r2(raw_zip, R2_BUCKET_WDI)
+        # Sync the raw ZIP to the "raw" folder within the R2 bucket
+        sync_to_r2(raw_zip, f"{R2_BUCKET_WDI}/raw")
         process_wdi_data(raw_zip, temp_dir)
         for file in os.listdir(temp_dir):
             if file.endswith(".parquet"):
                 local_file = os.path.join(temp_dir, file)
+                # Sync the parquet files to the root of the R2 bucket
                 sync_to_r2(local_file, R2_BUCKET_WDI)
     finally:
         print("Cleaning up temporary files...")

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# filepath: /workspaces/dbt-duckdb/download_population.py
 import os
 import subprocess
 import tempfile
@@ -50,8 +51,7 @@ def save_population_parquet(pop_list, dest_file):
 def sync_to_r2(local_path, r2_bucket):
     print(
         f"Checking if {os.path.basename(local_path)} is new by comparing with {r2_bucket}...")
-    check_cmd = ["doppler", "run", "--",
-                 "rclone", "check", local_path, r2_bucket]
+    check_cmd = ["rclone", "check", local_path, r2_bucket]
     result = subprocess.run(check_cmd, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"{os.path.basename(local_path)} has not changed on {r2_bucket}.")
@@ -59,17 +59,16 @@ def sync_to_r2(local_path, r2_bucket):
     else:
         print(
             f"New data detected for {os.path.basename(local_path)}. Syncing to {r2_bucket}...")
-        copy_cmd = ["doppler", "run", "--", "rclone",
-                    "copy", local_path, r2_bucket, "--checksum"]
+        copy_cmd = ["rclone", "copy", local_path, r2_bucket, "--checksum"]
         subprocess.run(copy_cmd, check=True)
         return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Fetch population data from the World Bank API, store as Parquet, and sync to Cloudflare R2 using Doppler."
+        description="Fetch population data from the World Bank API, store as Parquet, and sync to Cloudflare R2."
     )
-    parser.parse_args()
+    args = parser.parse_args()
 
     temp_dir = tempfile.mkdtemp()
     print(f"Temporary directory: {temp_dir}")
