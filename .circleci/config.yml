@@ -117,10 +117,18 @@ jobs:
           name: Install sqlite3
           command: sudo apt-get update && sudo apt-get install -y sqlite3
 
+      # Install Node.js and npm
+      - run:
+          name: Install Node.js and npm
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y nodejs npm
+
       # Run the DuckDB to SQLite export script
       - run:
           name: Export DuckDB to R2 and D1
           command: python duckdbexport.py --mode all
+
 
 workflows:
   download_transform_load:
