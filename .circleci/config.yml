@@ -6,29 +6,24 @@ jobs:
       - image: cimg/python:3.13
     steps:
       - checkout
-
       # Install rclone via curl
       - run:
           name: Install rclone
           command: |
             curl https://rclone.org/install.sh | sudo bash
-
       # Restore pip cache
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
-
       # Install pip modules from requirements.txt
       - run:
           name: Install pip modules
           command: pip install -r requirements.txt
-
       # Save pip cache for subsequent builds
       - save_cache:
           paths:
             - ~/.cache/pip
           key: pip-cache-{{ checksum "requirements.txt" }}
-
       # Run the population download script
       - run:
           name: Download Population Data
@@ -39,41 +34,36 @@ jobs:
       - image: cimg/python:3.13
     steps:
       - checkout
-
       # Install rclone
       - run:
           name: Install rclone
           command: |
             curl https://rclone.org/install.sh | sudo bash
-
       # Restore pip cache
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
-
       # Install pip modules
       - run:
           name: Install pip modules
           command: pip install -r requirements.txt
-
       # Save pip cache
       - save_cache:
           paths:
             - ~/.cache/pip
           key: pip-cache-{{ checksum "requirements.txt" }}
-
       # Run the WDI download script
       - run:
           name: Download WDI Data
           command: python download_wdi.py
 
-  transform:
+  transform_and_load:
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
 
-      # Install rclone
+      # Install rclone (if needed by your scripts)
       - run:
           name: Install rclone
           command: |
@@ -83,12 +73,10 @@ jobs:
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
-
       # Install pip modules
       - run:
           name: Install pip modules
           command: pip install -r requirements.txt
-
       # Save pip cache
       - save_cache:
           paths:
@@ -123,49 +111,23 @@ jobs:
             pushd wdi
             dbt docs generate --target prod
             popd
-      # Persist the wdi.duckdb file to the workspace
-      - persist_to_workspace:
-          root: .
-          paths:
-            - wdi.duckdb
 
-  load:
-    docker:
-      - image: cimg/python:3.13
-    steps:
-      - checkout
-      # Attach the workspace so that wdi.duckdb is available
-      - attach_workspace:
-          at: .
-      # Install sqlite3 so that the sqlite3 command is available
+      # Install sqlite3 so that the sqlite3 command is available for export
       - run:
           name: Install sqlite3
           command: sudo apt-get update && sudo apt-get install -y sqlite3
-      # Restore and install pip cache/modules steps here...
-      - restore_cache:
-          keys:
-            - pip-cache-{{ checksum "requirements.txt" }}
+
+      # Run the DuckDB to SQLite export script
       - run:
-          name: Install pip modules
-          command: pip install -r requirements.txt
-      - save_cache:
-          paths:
-            - ~/.cache/pip
-          key: pip-cache-{{ checksum "requirements.txt" }}
-      # Now run the DuckDB to SQLite export script, which can use wdi.duckdb
-      - run:
-          name: Export DuckDB to SQLite
-          command: python duckdb2sqlite.py
+          name: Export DuckDB to R2 and D1
+          command: python duckdbexport.py --mode all
 
 workflows:
   download_transform_load:
     jobs:
       - download_population
       - download_wdi
-      - transform:
+      - transform_and_load:
           requires:
             - download_population
             - download_wdi
-      - load:
-          requires:
-            - transform

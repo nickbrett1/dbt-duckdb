@@ -3,6 +3,7 @@ database.duckdb
 wdi.duckdb
 wdi.sqlite3
 wdi.sql
+wdi.hash
 .user.yml
 *_profile.html
 node_modules/
