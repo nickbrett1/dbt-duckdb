@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-# filepath: /workspaces/dbt-duckdb/duckdbexport.py
 import os
 import duckdb
 import sqlite3
 import subprocess
 import re
 import argparse
+import sys
+import filecmp
+import hashlib
+import pandas as pd
 import tempfile
 
 
@@ -128,8 +131,8 @@ def update_d1_from_dump(sql_dump_file: str):
 def export_mart_tables_parquet(duckdb_filename: str, output_dir: str):
     """
     Export all marts tables from DuckDB as local Parquet files.
-    The exported data is ordered by all columns so that repeated exports
-    generate identical files if the underlying data doesn't change.
+    The exported data is ordered by all columns so that repeated exports generate
+    identical files if the underlying data doesn't change.
     """
     duck_conn = duckdb.connect(duckdb_filename, read_only=True)
     tables = duck_conn.execute("SHOW TABLES;").fetchall()
@@ -144,14 +147,22 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str):
         if table_name.startswith(mart_prefixes):
             parquet_filename = os.path.join(
                 output_dir, f"{table_name}.parquet")
-            # Get column names for the table.
             cols_info = duck_conn.execute(f"DESCRIBE {table_name}").fetchall()
             if not cols_info:
                 print(f"Warning: Could not retrieve columns for {table_name}")
                 continue
-            col_names = [col[0] for col in cols_info]
-            order_by = ", ".join(col_names)
-            copy_query = f"COPY (SELECT * FROM {table_name} ORDER BY {order_by}) TO '{parquet_filename}' (FORMAT 'parquet')"
+            order_by = ", ".join([col[0] for col in cols_info])
+            select_exprs = []
+            for col in cols_info:
+                col_name = col[0]
+                # Simply select the column.
+                expr = col_name
+                select_exprs.append(expr)
+            select_list = ", ".join(select_exprs)
+            copy_query = (
+                f"COPY (SELECT {select_list} FROM {table_name} ORDER BY {order_by}) "
+                f"TO '{parquet_filename}' (FORMAT 'parquet')"
+            )
             duck_conn.execute(copy_query)
             print(f"Exported table {table_name} to {parquet_filename}")
         else:
@@ -160,65 +171,142 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str):
     print("Local Parquet export complete.")
 
 
+def download_remote_parquet(remote_dir: str) -> None:
+    """
+    Download marts Parquet files (those starting with 'fct_' or 'dim_')
+    from R2 (folder r2:wdi) to a local directory.
+    """
+    os.makedirs(remote_dir, exist_ok=True)
+    subprocess.run(
+        [
+            "rclone", "copy", "r2:wdi", remote_dir,
+            "--include", "fct_*.parquet",
+            "--include", "dim_*.parquet"
+        ],
+        check=True
+    )
+    print(f"Downloaded remote marts Parquet files to {remote_dir}")
+
+
+def md5sum(filename: str) -> str:
+    """Compute the MD5 hash of a file."""
+    hash_md5 = hashlib.md5()
+    with open(filename, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def load_and_sort_parquet(filename: str) -> pd.DataFrame:
+    try:
+        df = pd.read_parquet(filename)
+    except Exception as e:
+        print(f"Error reading {filename}: {e}")
+        raise
+    # Sort the DataFrame by all columns to ensure deterministic order.
+    sort_cols = df.columns.tolist()
+    df = df.sort_values(by=sort_cols).reset_index(drop=True)
+    return df
+
+
+def parquet_files_differ(local_dir: str, remote_dir: str) -> bool:
+    """
+    Compare local and remote Parquet files in a one-way diff,
+    tolerating small differences in floating point numbers.
+    For each local Parquet file, ensure that an identical file exists in remote_dir,
+    up to a specified tolerance.
+    Returns True if any local file is missing or differs beyond the tolerance.
+    """
+    local_files = sorted([f for f in os.listdir(
+        local_dir) if f.endswith(".parquet")])
+    if not local_files:
+        print("No local Parquet files to compare.")
+        return False
+
+    # Tolerance value for differences in floating point numbers.
+    tolerance = 5e-4  # Accepts a difference of 0.0005
+
+    for f in local_files:
+        local_path = os.path.join(local_dir, f)
+        remote_path = os.path.join(remote_dir, f)
+        if not os.path.exists(remote_path):
+            print(f"Remote file is missing: {f}")
+            return True
+        try:
+            local_df = load_and_sort_parquet(local_path)
+            remote_df = load_and_sort_parquet(remote_path)
+        except Exception as e:
+            print(f"Failed to load Parquet file {f}: {e}")
+            return True
+
+        try:
+            pd.testing.assert_frame_equal(
+                local_df, remote_df, rtol=0, atol=tolerance, check_exact=False
+            )
+        except AssertionError as e:
+            print(
+                f"Data mismatch in file: {f} beyond tolerance (atol={tolerance}).")
+            print(f"Local file: {local_path}")
+            print(f"Remote file: {remote_path}")
+            print("AssertionError:", e)
+            return True
+
+    print("All local Parquet files are within tolerance in the remote directory.")
+    return False
+
+
 def parquet_changes_exist(parquet_dir: str) -> bool:
     """
-    Use rclone check with --one-way to compare .parquet files in parquet_dir with those stored in R2.
+    Download Parquet files from R2 to a temporary directory and compare to the local files.
     Returns True if differences are detected.
     """
-    print("Checking for differences in Parquet files in temporary directory compared to R2...")
-    try:
-        subprocess.run(
-            ["rclone", "check", parquet_dir, "r2:wdi", "--include",
-                "*.parquet", "--one-way"],
-            check=True, capture_output=True, text=True
-        )
-        print("No differences found in Parquet files on R2.")
-        return False
-    except subprocess.CalledProcessError:
-        print("Differences detected in Parquet files on R2.")
-        return True
+    with tempfile.TemporaryDirectory() as remote_parquet_dir:
+        download_remote_parquet(remote_parquet_dir)
+        return parquet_files_differ(parquet_dir, remote_parquet_dir)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=("Exports DuckDB marts tables as temporary Parquet files "
-                     "and syncs them to Cloudflare R2. By default, the D1 export "
-                     "process is skipped and is only executed if --force-d1 is provided, "
-                     "using temporary SQLite and SQL dump files.")
+        description=("Exports DuckDB marts tables as Parquet files, "
+                     "checks for differences in the Parquet files on R2, "
+                     "and if differences are detected (or if --force-d1 is provided), triggers "
+                     "the D1 export process and syncs the Parquet files back to R2.")
     )
     parser.add_argument("--force-d1", action="store_true",
                         help="Force D1 export process.")
     args = parser.parse_args()
 
-    duckdb_filename = "wdi.duckdb"  # Existing DuckDB file
+    duckdb_filename = "wdi.duckdb"   # Existing DuckDB file
 
-    # Step 1: Generate temporary local Parquet files.
-    with tempfile.TemporaryDirectory(prefix="parquet_") as parquet_dir:
+    # Use temporary directories for storing the parquet and sqlite files.
+    with tempfile.TemporaryDirectory() as parquet_dir, tempfile.TemporaryDirectory() as sqlite_dir:
         print(f"Using temporary directory for Parquet files: {parquet_dir}")
+        print(f"Using temporary directory for SQLite files: {sqlite_dir}")
+
+        # Step 1: Export local Parquet files.
         export_mart_tables_parquet(duckdb_filename, parquet_dir)
 
-        # Sync the Parquet files to R2.
-        print("Syncing Parquet files to R2...")
-        subprocess.run(
-            ["rclone", "copy", parquet_dir, "r2:wdi",
-                "--include", "*.parquet", "--checksum"],
-            check=True
-        )
-
-        # Step 2: Run D1 export process only if --force-d1 is provided.
-        if args.force_d1:
-            with tempfile.TemporaryDirectory(prefix="sqlite_") as tmp_sqlite_dir:
-                sqlite_filename = os.path.join(tmp_sqlite_dir, "wdi.sqlite3")
-                sql_dump_file = os.path.join(tmp_sqlite_dir, "wdi.sql")
-                print(
-                    f"Using temporary directory for SQLite export: {tmp_sqlite_dir}")
-                export_duckdb_to_sqlite(duckdb_filename, sqlite_filename)
-                dump_and_clean_sqlite(sqlite_filename, sql_dump_file)
-                update_d1_from_dump(sql_dump_file)
+        # Step 2: Check for differences in Parquet files on R2.
+        differences = parquet_changes_exist(parquet_dir)
+        if differences or args.force_d1:
+            print("Differences detected (or forced). Syncing Parquet files back to R2 and triggering D1 export process.")
+            subprocess.run(
+                ["rclone", "copy", parquet_dir, "r2:wdi",
+                 "--include", "*.parquet", "--checksum"],
+                check=True
+            )
+            # Step 3: Run D1 export process.
+            sqlite_filename = os.path.join(sqlite_dir, "wdi.sqlite3")
+            sql_dump_file = os.path.join(sqlite_dir, "wdi.sql")
+            print(
+                f"Exporting to SQLite database in temporary directory: {sqlite_dir}")
+            export_duckdb_to_sqlite(duckdb_filename, sqlite_filename)
+            dump_and_clean_sqlite(sqlite_filename, sql_dump_file)
+            update_d1_from_dump(sql_dump_file)
         else:
-            print("D1 export process skipped.")
+            print("No differences found in Parquet files; D1 export process skipped.")
 
-    print("Process complete.")
+        print("Process complete.")
 
 
 if __name__ == '__main__':
