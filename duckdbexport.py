@@ -109,19 +109,35 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str) -> Non
     print(f"Cleaned SQL dump is written to {output_sql_filename}")
 
 
-def update_d1_from_dump(sql_dump_file: str):
-    list_cmd = "npx wrangler d1 list"
-    result = subprocess.run(list_cmd, shell=True,
+def drop_mart_tables_from_d1() -> None:
+    """
+    List tables from the Cloudflare D1 'wdi' database and drop all marts tables,
+    that is, those whose names start with 'fct_' or 'dim_'.
+    """
+    print("Listing tables in Cloudflare D1 database 'wdi'...")
+    list_tables_cmd = "npx wrangler d1 execute wdi --sql \"SHOW TABLES;\""
+    result = subprocess.run(list_tables_cmd, shell=True,
                             capture_output=True, text=True)
-    if "wdi" in result.stdout:
-        print("Existing Cloudflare D1 database 'wdi' found; deleting it...")
-        delete_cmd = "npx wrangler d1 delete wdi -y"
-        subprocess.run(delete_cmd, shell=True, check=True)
-    else:
-        print("Cloudflare D1 database 'wdi' does not exist; no need to delete.")
-    print("Creating Cloudflare D1 database 'wdi'...")
-    create_cmd = "npx wrangler d1 create wdi"
-    subprocess.run(create_cmd, shell=True, check=True)
+    # Parse the output lines and assume each non-header line is a table name.
+    mart_tables = []
+    for line in result.stdout.splitlines():
+        # Skip header lines if any (assuming table names start with fct_ or dim_)
+        table = line.strip()
+        if table.startswith("fct_") or table.startswith("dim_"):
+            mart_tables.append(table)
+    if not mart_tables:
+        print("No marts tables to drop in D1 database 'wdi'.")
+        return
+    for table in mart_tables:
+        drop_cmd = f"npx wrangler d1 execute wdi --sql \"DROP TABLE IF EXISTS {table};\" --yes"
+        subprocess.run(drop_cmd, shell=True, check=True)
+        print(f"Dropped table {table} from D1 database 'wdi'.")
+
+
+def update_d1_from_dump(sql_dump_file: str):
+    # Instead of deleting the entire database, only drop marts tables.
+    print("Dropping marts tables from Cloudflare D1 database 'wdi'...")
+    drop_mart_tables_from_d1()
     print("Updating Cloudflare D1 database 'wdi' using the new SQL dump...")
     update_cmd = f"npx wrangler d1 execute wdi --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
@@ -254,6 +270,43 @@ def parquet_changes_exist(parquet_dir: str) -> bool:
     with tempfile.TemporaryDirectory() as remote_parquet_dir:
         download_remote_parquet(remote_parquet_dir)
         return parquet_files_differ(parquet_dir, remote_parquet_dir)
+
+
+def drop_mart_tables_from_sqlite(db_filename: str) -> None:
+    """
+    List tables from the SQLite database and drop all marts tables,
+    that is, those whose names start with 'fct_' or 'dim_'.
+    """
+    import sqlite3
+    conn = sqlite3.connect(db_filename)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND (name LIKE 'fct_%' OR name LIKE 'dim_%');"
+    )
+    mart_tables = [row[0] for row in cursor.fetchall()]
+    if not mart_tables:
+        print("No marts tables to drop in SQLite database.")
+        conn.close()
+        return
+    for table in mart_tables:
+        cursor.execute(f"DROP TABLE IF EXISTS {table};")
+        print(f"Dropped table {table} from SQLite database.")
+    conn.commit()
+    conn.close()
+
+
+def update_sqlite_from_dump(db_filename: str, sql_dump_file: str):
+    """
+    Instead of deleting the entire database, only drop marts tables,
+    then update the SQLite database using the new SQL dump file.
+    """
+    print("Dropping marts tables from SQLite database...")
+    drop_mart_tables_from_sqlite(db_filename)
+    print("Updating SQLite database using the new SQL dump...")
+    # Use sqlite3 command-line to read the SQL dump.
+    update_cmd = f'sqlite3 {db_filename} ".read {sql_dump_file}"'
+    subprocess.run(update_cmd, shell=True, check=True)
+    print("SQLite database updated using the new SQL dump.")
 
 
 def main():

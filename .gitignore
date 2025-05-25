@@ -7,3 +7,4 @@ wdi.hash
 .user.yml
 *_profile.html
 node_modules/
+.wrangler
