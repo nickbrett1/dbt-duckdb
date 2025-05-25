@@ -188,15 +188,6 @@ def download_remote_parquet(remote_dir: str) -> None:
     print(f"Downloaded remote marts Parquet files to {remote_dir}")
 
 
-def md5sum(filename: str) -> str:
-    """Compute the MD5 hash of a file."""
-    hash_md5 = hashlib.md5()
-    with open(filename, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
 def load_and_sort_parquet(filename: str) -> pd.DataFrame:
     try:
         df = pd.read_parquet(filename)
