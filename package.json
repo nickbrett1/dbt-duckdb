@@ -6,8 +6,9 @@
     "populate:postgres": "doppler run -- python populate.py --use-postgres",
     "download:population": "doppler run -- python download_population.py",
     "download:wdi": "doppler run -- python download_wdi.py",
-    "export": "doppler run -- python duckdbexport.py",
-    "export:force-d1": "doppler run -- python duckdbexport.py --force-d1"
+    "dev:export": "doppler run -- python duckdbexport.py --local-d1 --sample-d1",
+    "dev:export:force-d1": "doppler run -- python duckdbexport.py --force-d1 --local-d1 --sample-d1",
+    "dev:export:ignore-d1": "doppler run -- python duckdbexport.py --ignore-d1 --local-d1"
   },
   "dependencies": {}
 }
