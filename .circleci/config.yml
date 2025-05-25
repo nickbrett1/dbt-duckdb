@@ -127,7 +127,7 @@ jobs:
       # Run the DuckDB to SQLite export script
       - run:
           name: Export DuckDB to R2 and D1
-          command: python duckdbexport.py
+          command: python duckdbexport.py --remote-d1
 
 
 workflows:
