@@ -114,6 +114,31 @@ def dump_and_clean_sqlite(sqlite_filename: str, output_sql_filename: str) -> Non
     print(f"Cleaned SQL dump is written to {output_sql_filename}")
 
 
+def split_sql_dump(sql_dump_file: str, out_dir: str, max_statements: int = 6000) -> list:
+    """
+    Splits the SQL dump file into multiple files, each containing no more than max_statements.
+    Returns a list of output file paths.
+    """
+    with open(sql_dump_file, "r", encoding="utf-8") as f:
+        content = f.read()
+    # Split on semicolon; assumes that semicolon correctly ends each statement.
+    # (If there are semicolons in literals, a more robust parser will be needed.)
+    statements = [stmt.strip() for stmt in content.split(';') if stmt.strip()]
+    output_files = []
+    for i in range(0, len(statements), max_statements):
+        chunk = statements[i:i+max_statements]
+        # Re-add semicolon and newline after each statement.
+        chunk_text = ";\n".join(chunk) + ";\n"
+        out_file = os.path.join(
+            out_dir, f"wdi_part{(i//max_statements)+1}.sql")
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(chunk_text)
+        output_files.append(out_file)
+        print(
+            f"Created SQL dump chunk: {out_file} with {len(chunk)} statements.")
+    return output_files
+
+
 def drop_mart_tables_from_d1(use_local: bool) -> None:
     """
     List tables from the Cloudflare D1 'wdi' database and drop all marts tables,
@@ -140,21 +165,30 @@ def drop_mart_tables_from_d1(use_local: bool) -> None:
 
 
 def update_d1_from_dump(sql_dump_file: str, use_local: bool):
-    # Instead of deleting the entire database, only drop marts tables.
     print("Dropping marts tables from Cloudflare D1 database 'wdi'...")
     drop_mart_tables_from_d1(use_local)
-    print("Updating Cloudflare D1 database 'wdi' using the new SQL dump...")
+    print("Updating Cloudflare D1 database 'wdi' using the SQL dump chunk...")
     local_flag = "--local" if use_local else ""
     update_cmd = f"npx wrangler d1 execute wdi {local_flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
-    print("Cloudflare D1 database 'wdi' updated using the new SQL dump.")
+    print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
+
+
+def update_d1_chunk(sql_dump_file: str, use_local: bool):
+    """
+    Update Cloudflare D1 database by executing a single SQL dump chunk.
+    This function does NOT drop marts tables.
+    """
+    local_flag = "--local" if use_local else ""
+    update_cmd = f"npx wrangler d1 execute wdi {local_flag} --file {sql_dump_file} --yes"
+    subprocess.run(update_cmd, shell=True, check=True)
+    print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
 
 
 def export_mart_tables_parquet(duckdb_filename: str, output_dir: str):
     """
     Export all marts tables from DuckDB as local Parquet files.
-    The exported data is ordered by all columns so that repeated exports generate
-    identical files if the underlying data doesn't change.
+    The exported data is ordered by all columns.
     """
     duck_conn = duckdb.connect(duckdb_filename, read_only=True)
     tables = duck_conn.execute("SHOW TABLES;").fetchall()
@@ -174,12 +208,7 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str):
                 print(f"Warning: Could not retrieve columns for {table_name}")
                 continue
             order_by = ", ".join([col[0] for col in cols_info])
-            select_exprs = []
-            for col in cols_info:
-                col_name = col[0]
-                # Simply select the column.
-                expr = col_name
-                select_exprs.append(expr)
+            select_exprs = [col[0] for col in cols_info]
             select_list = ", ".join(select_exprs)
             copy_query = (
                 f"COPY (SELECT {select_list} FROM {table_name} ORDER BY {order_by}) "
@@ -224,22 +253,15 @@ def load_and_sort_parquet(filename: str) -> pd.DataFrame:
 
 def parquet_files_differ(local_dir: str, remote_dir: str) -> bool:
     """
-    Compare local and remote Parquet files in a one-way diff,
-    tolerating small differences in floating point numbers using both
-    relative and absolute tolerance.
-    For each local Parquet file, ensure that an identical file exists in remote_dir.
-    Returns True if any local file is missing or differs beyond the tolerance.
+    Compare local and remote Parquet files, tolerating small floating point differences.
     """
     local_files = sorted([f for f in os.listdir(
         local_dir) if f.endswith(".parquet")])
     if not local_files:
         print("No local Parquet files to compare.")
         return False
-
-    # Tolerance values: relative tolerance and absolute tolerance.
-    tolerance_rel = 1e-5  # relative tolerance
-    tolerance_abs = 5e-4  # absolute tolerance
-
+    tolerance_rel = 1e-5
+    tolerance_abs = 5e-4
     for f in local_files:
         local_path = os.path.join(local_dir, f)
         remote_path = os.path.join(remote_dir, f)
@@ -252,10 +274,10 @@ def parquet_files_differ(local_dir: str, remote_dir: str) -> bool:
         except Exception as e:
             print(f"Failed to load Parquet file {f}: {e}")
             return True
-
         try:
             pd.testing.assert_frame_equal(
-                local_df, remote_df, rtol=tolerance_rel, atol=tolerance_abs, check_exact=False
+                local_df, remote_df,
+                rtol=tolerance_rel, atol=tolerance_abs, check_exact=False
             )
         except AssertionError as e:
             print(
@@ -264,14 +286,13 @@ def parquet_files_differ(local_dir: str, remote_dir: str) -> bool:
             print(f"Remote file: {remote_path}")
             print("AssertionError:", e)
             return True
-
     print("All local Parquet files are within tolerances in the remote directory.")
     return False
 
 
 def parquet_changes_exist(parquet_dir: str) -> bool:
     """
-    Download Parquet files from R2 to a temporary directory and compare to the local files.
+    Download Parquet files from R2 to a temporary directory and compare to local files.
     Returns True if differences are detected.
     """
     with tempfile.TemporaryDirectory() as remote_parquet_dir:
@@ -281,10 +302,8 @@ def parquet_changes_exist(parquet_dir: str) -> bool:
 
 def drop_mart_tables_from_sqlite(db_filename: str) -> None:
     """
-    List tables from the SQLite database and drop all marts tables,
-    that is, those whose names start with 'fct_' or 'dim_'.
+    List and drop all marts tables (names starting with 'fct_' or 'dim_') in SQLite.
     """
-    import sqlite3
     conn = sqlite3.connect(db_filename)
     cursor = conn.cursor()
     cursor.execute(
@@ -304,13 +323,11 @@ def drop_mart_tables_from_sqlite(db_filename: str) -> None:
 
 def update_sqlite_from_dump(db_filename: str, sql_dump_file: str):
     """
-    Instead of deleting the entire database, only drop marts tables,
-    then update the SQLite database using the new SQL dump file.
+    Drop marts tables and update the SQLite database using the new SQL dump.
     """
     print("Dropping marts tables from SQLite database...")
     drop_mart_tables_from_sqlite(db_filename)
     print("Updating SQLite database using the new SQL dump...")
-    # Use sqlite3 command-line to read the SQL dump.
     update_cmd = f'sqlite3 {db_filename} ".read {sql_dump_file}"'
     subprocess.run(update_cmd, shell=True, check=True)
     print("SQLite database updated using the new SQL dump.")
@@ -319,21 +336,20 @@ def update_sqlite_from_dump(db_filename: str, sql_dump_file: str):
 def main():
     parser = argparse.ArgumentParser(
         description=("Exports DuckDB marts tables as Parquet files, "
-                     "checks for differences in the Parquet files on R2, "
-                     "and if differences are detected (or if --force-d1 is provided), triggers "
-                     "the D1 export process and syncs the Parquet files back to R2.")
+                     "checks differences in Parquet files on R2, and if differences are detected "
+                     "(or if --force-d1 is provided), triggers the D1 export process and syncs the files back to R2.")
     )
     parser.add_argument("--force-d1", action="store_true",
                         help="Force D1 export process.")
     parser.add_argument("--local-d1", action="store_true",
-                        help="Use local development D1 database (adds --local flag to wrangler commands).")
+                        help="Use local development D1 database (adds --local to commands).")
     parser.add_argument("--ignore-d1", action="store_true",
                         help="Ignore the D1 export process and exit after detecting differences.")
     parser.add_argument("--sample-d1", action="store_true",
                         help="Only export 1% of rows for D1 export (for testing purposes).")
     args = parser.parse_args()
 
-    duckdb_filename = "wdi.duckdb"   # Existing DuckDB file
+    duckdb_filename = "wdi.duckdb"  # Existing DuckDB file
 
     with tempfile.TemporaryDirectory() as parquet_dir, tempfile.TemporaryDirectory() as sqlite_dir:
         print(f"Using temporary directory for Parquet files: {parquet_dir}")
@@ -346,7 +362,6 @@ def main():
         differences = parquet_changes_exist(parquet_dir)
         if differences or args.force_d1:
             print("Differences detected (or forced).")
-
             print("Syncing Parquet files back to R2 and triggering D1 export process.")
             subprocess.run(
                 ["rclone", "copy", parquet_dir, "r2:wdi",
@@ -357,7 +372,8 @@ def main():
             if args.ignore_d1:
                 print("Ignoring D1 export process as per flag. Exiting now.")
                 return
-            # Step 3: Run D1 export process.
+
+            # Step 3: Export to SQLite and dump clean SQL.
             sqlite_filename = os.path.join(sqlite_dir, "wdi.sqlite3")
             sql_dump_file = os.path.join(sqlite_dir, "wdi.sql")
             print(
@@ -365,7 +381,16 @@ def main():
             export_duckdb_to_sqlite(
                 duckdb_filename, sqlite_filename, sample=args.sample_d1)
             dump_and_clean_sqlite(sqlite_filename, sql_dump_file)
-            update_d1_from_dump(sql_dump_file, args.local_d1)
+
+            # Split the SQL dump into chunks (max 6000 statements each).
+            sql_files = split_sql_dump(
+                sql_dump_file, sqlite_dir, max_statements=6000)
+
+            print(
+                "Dropping marts tables from Cloudflare D1 database 'wdi' once before updates...")
+            drop_mart_tables_from_d1(args.local_d1)
+            for sql_file in sql_files:
+                update_d1_chunk(sql_file, args.local_d1)
         else:
             print("No differences found in Parquet files; D1 export process skipped.")
 
