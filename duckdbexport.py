@@ -10,6 +10,7 @@ import filecmp
 import hashlib
 import pandas as pd
 import tempfile
+import json
 
 
 def map_type(duck_type: str) -> str:
@@ -153,19 +154,36 @@ def drop_mart_tables_from_d1(d1_mode: str) -> None:
                             capture_output=True, text=True)
 
     mart_tables = []
-    for line in result.stdout.splitlines():
-        # Only process lines that contain a vertical bar
-        if "│" in line:
-            # Split on the vertical bar - expected format: │ table_name │
-            parts = line.split("│")
-            if len(parts) < 2:
-                continue
-            table = parts[1].strip()
-            # Skip header labels and empty lines
-            if table.lower() == "name" or not table:
-                continue
-            if table.startswith("fct_") or table.startswith("dim_"):
-                mart_tables.append(table)
+    stdout = result.stdout.strip()
+    # Attempt to find and parse JSON output from the command.
+    json_start = stdout.find('[')
+    if json_start != -1:
+        try:
+            json_text = stdout[json_start:]
+            data = json.loads(json_text)
+            # Assume the structure is a list with one entry having a "results" list
+            if isinstance(data, list) and len(data) > 0:
+                results = data[0].get("results", [])
+                for item in results:
+                    table = item.get("name", "").strip()
+                    if table.lower() == "name" or not table:
+                        continue
+                    if table.startswith("fct_") or table.startswith("dim_"):
+                        mart_tables.append(table)
+        except Exception as e:
+            print("Failed to parse JSON output:", e)
+    else:
+        # Fallback processing on line-by-line output (for alkternative formats)
+        for line in stdout.splitlines():
+            if "│" in line:
+                parts = line.split("│")
+                if len(parts) < 2:
+                    continue
+                table = parts[1].strip()
+                if table.lower() == "name" or not table:
+                    continue
+                if table.startswith("fct_") or table.startswith("dim_"):
+                    mart_tables.append(table)
 
     if not mart_tables:
         print("No marts tables to drop in D1 database 'wdi'.")

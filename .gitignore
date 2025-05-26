@@ -8,3 +8,4 @@ wdi.hash
 *_profile.html
 node_modules/
 .wrangler
+__pycache__/
