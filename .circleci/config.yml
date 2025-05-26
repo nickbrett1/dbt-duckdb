@@ -109,8 +109,13 @@ jobs:
           name: Generate dbt docs
           command: |
             pushd wdi
-            dbt docs generate --target prod
+            dbt docs generate --target prod --static
             popd
+
+      # Upload the generated static_index.html to R2 docs folder
+      - run:
+          name: Upload dbt docs static index to R2
+          command: rclone copy wdi/target/static_index.html r2:wdi/docs --checksum
 
       # Install sqlite3 so that the sqlite3 command is available for export
       - run:

@@ -46,8 +46,8 @@
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// dbt-core is installed here early so it's picked up by the dbt vscode extension.
-	"postCreateCommand": "/bin/bash -c 'if ! doppler me >/dev/null 2>&1; then doppler login --no-check-version --no-timeout --yes && doppler setup --no-interactive; fi; sudo bash .devcontainer/setup-postgres.sh; pip install --upgrade pip; pip install dbt-core; pip3 install --user -r requirements.txt; yes | npx wrangler@latest login'"
+	// dbt-core, dbt-postgres and dbt-duckdb are installed here early so it's picked up by the dbt vscode extension.
+	"postCreateCommand": "/bin/bash -c 'if ! doppler me >/dev/null 2>&1; then doppler login --no-check-version --no-timeout --yes && doppler setup --no-interactive; fi; sudo bash .devcontainer/setup-postgres.sh; pip install --upgrade pip; pip install dbt-core dbt-postgres dbt-duckdb; pip3 install --user -r requirements.txt; yes | npx wrangler@latest login'"
 	// Configure tool-specific properties.
 	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
