@@ -52,27 +52,34 @@ def export_table(duck_conn, sqlite_conn, table_name: str, sample: bool = False):
     sqlite_conn.commit()
 
 
-def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: bool = False):
+def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: bool = False, tables_to_export: list = None):
     if os.path.exists(sqlite_filename):
         print(f"Overwriting existing {sqlite_filename} file.")
         os.remove(sqlite_filename)
     duck_conn = duckdb.connect(duckdb_filename, read_only=True)
     sqlite_conn = sqlite3.connect(sqlite_filename)
-    tables = duck_conn.execute("SHOW TABLES;").fetchall()
+
+    # Get all tables from DuckDB.
+    all_tables = duck_conn.execute("SHOW TABLES;").fetchall()
+    if tables_to_export:
+        # Filter to only export the specified tables.
+        tables = [t for t in all_tables if t[0] in tables_to_export]
+        print(
+            f"Exporting only the following tables from DuckDB: {', '.join(t[0] for t in tables)}")
+    else:
+        tables = all_tables
+
     if not tables:
-        print("No tables found in DuckDB.")
+        print("No tables found for export in DuckDB.")
         duck_conn.close()
         sqlite_conn.close()
         return
-    mart_prefixes = ("fct_", "dim_")
+
     print("Exporting marts tables from DuckDB to SQLite:")
-    for table in tables:
-        table_name = table[0]
-        if table_name.startswith(mart_prefixes):
-            print(f" * Exporting table: {table_name}")
-            export_table(duck_conn, sqlite_conn, table_name, sample)
-        else:
-            print(f" - Skipping non-mart table: {table_name}")
+    for row in tables:
+        table_name = row[0]
+        print(f" * Exporting table: {table_name}")
+        export_table(duck_conn, sqlite_conn, table_name, sample)
     duck_conn.close()
     sqlite_conn.close()
     print("DuckDB export to SQLite complete.")
@@ -315,14 +322,41 @@ def get_changed_mart_tables_from_parquet(local_dir: str, remote_dir: str) -> lis
 
 def dump_table_from_sqlite(db_filename: str, table: str, output_file: str) -> None:
     """
-    Dumps only the specified table from the SQLite database.
+    Dumps only the specified table from the SQLite database and cleans the output
+    by removing transaction markers and any _cf_KV related blocks, similar to dump_and_clean_sqlite.
     """
     dump_cmd = f'sqlite3 {db_filename} ".dump {table}"'
     result = subprocess.run(dump_cmd, shell=True,
                             capture_output=True, text=True, check=True)
+    dump_text = result.stdout
+    print(f"Dumped raw SQL for table {table}. Starting clean-up...")
+
+    cleaned_lines = []
+    skip_kv_block = False
+    total_lines = 0
+    skipped_lines = 0
+    kv_pattern = re.compile(r'^CREATE TABLE _cf_KV ')
+    for line in dump_text.splitlines():
+        total_lines += 1
+        if line.startswith("BEGIN TRANSACTION;") or line.startswith("COMMIT;"):
+            skipped_lines += 1
+            continue
+        if kv_pattern.match(line):
+            skip_kv_block = True
+            skipped_lines += 1
+            continue
+        if skip_kv_block:
+            skipped_lines += 1
+            if "WITHOUT ROWID;" in line:
+                skip_kv_block = False
+            continue
+        cleaned_lines.append(line)
+
+    cleaned_dump = "\n".join(cleaned_lines)
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write(result.stdout)
-    print(f"Dumped table {table} to {output_file}")
+        f.write(cleaned_dump)
+    print(
+        f"Dumped and cleaned table {table} to {output_file}. Processed {total_lines} lines, skipped {skipped_lines} lines.")
 
 
 # New per-table D1 functions
@@ -417,11 +451,9 @@ def main():
 
             # Step 3: Export to SQLite and dump clean SQL.
             sqlite_filename = os.path.join(sqlite_dir, "wdi.sqlite3")
-            dump_sql_file = os.path.join(sqlite_dir, "wdi.sql")
             print(f"Exporting to SQLite database in {sqlite_dir} ...")
-            export_duckdb_to_sqlite(
-                duckdb_filename, sqlite_filename, sample=args.sample_d1)
-            dump_and_clean_sqlite(sqlite_filename, dump_sql_file)
+            export_duckdb_to_sqlite(duckdb_filename, sqlite_filename,
+                                    sample=args.sample_d1, tables_to_export=tables_to_update)
 
             # For each table to update, dump just that table and update D1.
             for table in tables_to_update:
