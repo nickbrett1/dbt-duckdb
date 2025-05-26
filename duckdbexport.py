@@ -144,12 +144,12 @@ def split_sql_dump(sql_dump_file: str, out_dir: str, max_statements: int = 6000)
 def drop_mart_tables_from_d1(d1_mode: str) -> None:
     """
     List tables from the Cloudflare D1 'wdi' database and drop all marts tables using
-    wrangler@3.103.2 as a workaround for workers-sdk/issues/8153.
+    wrangler@latest.
     d1_mode should be "local" or "remote" which determines the flag passed to wrangler.
     """
     flag = "--local" if d1_mode == "local" else "--remote"
-    print("Listing tables in Cloudflare D1 database 'wdi' using wrangler@3.103.2 (using valid SQLite query)...")
-    list_tables_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --command \"SELECT name FROM sqlite_master WHERE type='table';\""
+    print("Listing tables in Cloudflare D1 database 'wdi' using wrangler@latest (using valid SQLite query)...")
+    list_tables_cmd = f"npx wrangler@latest d1 execute wdi {flag} --command \"SELECT name FROM sqlite_master WHERE type='table';\""
     result = subprocess.run(list_tables_cmd, shell=True,
                             capture_output=True, text=True)
 
@@ -173,7 +173,7 @@ def drop_mart_tables_from_d1(d1_mode: str) -> None:
         except Exception as e:
             print("Failed to parse JSON output:", e)
     else:
-        # Fallback processing on line-by-line output (for alkternative formats)
+        # Fallback processing on line-by-line output (for alternative formats)
         for line in stdout.splitlines():
             if "│" in line:
                 parts = line.split("│")
@@ -190,28 +190,28 @@ def drop_mart_tables_from_d1(d1_mode: str) -> None:
         return
 
     for table in mart_tables:
-        drop_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --command \"DROP TABLE IF EXISTS {table};\" --yes"
+        drop_cmd = f"npx wrangler@latest d1 execute wdi {flag} --command \"DROP TABLE IF EXISTS {table};\" --yes"
         subprocess.run(drop_cmd, shell=True, check=True)
         print(f"Dropped table {table} from D1 database 'wdi'.")
 
 
 def update_d1_from_dump(sql_dump_file: str, d1_mode: str):
-    print("Dropping marts tables from Cloudflare D1 database 'wdi' using wrangler@3.103.2...")
+    print("Dropping marts tables from Cloudflare D1 database 'wdi' using wrangler@latest...")
     drop_mart_tables_from_d1(d1_mode)
-    print("Updating Cloudflare D1 database 'wdi' using the SQL dump chunk with wrangler@3.103.2...")
+    print("Updating Cloudflare D1 database 'wdi' using the SQL dump chunk with wrangler@latest...")
     flag = "--local" if d1_mode == "local" else "--remote"
-    update_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --file {sql_dump_file} --yes"
+    update_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
     print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
 
 
 def update_d1_chunk(sql_dump_file: str, d1_mode: str):
     """
-    Update Cloudflare D1 database by executing a single SQL dump chunk using wrangler@3.103.2.
+    Update Cloudflare D1 database by executing a single SQL dump chunk using wrangler@latest.
     This function does NOT drop marts tables.
     """
     flag = "--local" if d1_mode == "local" else "--remote"
-    update_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --file {sql_dump_file} --yes"
+    update_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
     print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
 
