@@ -148,21 +148,29 @@ def drop_mart_tables_from_d1(d1_mode: str) -> None:
     """
     flag = "--local" if d1_mode == "local" else "--remote"
     print("Listing tables in Cloudflare D1 database 'wdi' using wrangler@3.103.2 (using valid SQLite query)...")
-    # Use a valid SQLite query instead of "SHOW TABLES;"
     list_tables_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --command \"SELECT name FROM sqlite_master WHERE type='table';\""
     result = subprocess.run(list_tables_cmd, shell=True,
                             capture_output=True, text=True)
+
     mart_tables = []
-    # Skip a header if present and process each line.
     for line in result.stdout.splitlines():
-        table = line.strip()
-        if table.lower() == "name":  # skip header line if any
-            continue
-        if table.startswith("fct_") or table.startswith("dim_"):
-            mart_tables.append(table)
+        # Only process lines that contain a vertical bar
+        if "│" in line:
+            # Split on the vertical bar - expected format: │ table_name │
+            parts = line.split("│")
+            if len(parts) < 2:
+                continue
+            table = parts[1].strip()
+            # Skip header labels and empty lines
+            if table.lower() == "name" or not table:
+                continue
+            if table.startswith("fct_") or table.startswith("dim_"):
+                mart_tables.append(table)
+
     if not mart_tables:
         print("No marts tables to drop in D1 database 'wdi'.")
         return
+
     for table in mart_tables:
         drop_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --command \"DROP TABLE IF EXISTS {table};\" --yes"
         subprocess.run(drop_cmd, shell=True, check=True)
