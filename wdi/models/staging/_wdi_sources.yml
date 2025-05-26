@@ -7,9 +7,10 @@ sources:
     description: "Raw data from WDI"
 
     tables:
-      - name: wdifootnote
-      - name: wdicountry
-      - name: wdicsv
-      - name: wdiseriestime
-      - name: wdiseries
-      - name: wdicountryseries
+      - name: WDIfootnote
+      - name: WDICountry
+      - name: WDICSV
+      - name: WDIseriestime
+      - name: WDISeries
+      - name: WDIcountryseries
+      - name: population_data

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# filepath: /workspaces/dbt-duckdb/populate.py
 import os
 import shutil
 import tempfile
@@ -6,7 +7,7 @@ import subprocess
 import duckdb
 import argparse
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 # Constants for processing
 # These will be the local mirror copies from the R2 bucket.
@@ -21,16 +22,10 @@ POSTGRES_PORT = 5432
 DUCKDB_DATABASE = f"{POSTGRES_DB}.duckdb"
 
 
-def copy_from_r2(remote_path, local_dir):
-    print(f"Copying {remote_path} from R2 to local directory {local_dir}...")
-    copy_cmd = ["rclone", "copy", remote_path, local_dir, "--checksum"]
-    subprocess.run(copy_cmd, check=True)
-    local_file = os.path.join(local_dir, os.path.basename(remote_path))
-    print(f"Copied file: {local_file}")
-    return local_file
-
-
 def process_parquet_duckdb(parquet_path, table_name):
+    print(
+        f"Processing table {table_name} in DuckDB from file {parquet_path}...")
+
     con = duckdb.connect(DUCKDB_DATABASE)
     con.execute("CREATE SCHEMA IF NOT EXISTS public")
     query = f"""
@@ -49,9 +44,15 @@ def process_parquet_duckdb(parquet_path, table_name):
 
 
 def process_parquet_postgres(parquet_path, table_name, engine):
+    print(
+        f"Processing table {table_name} in PostgreSQL from file {parquet_path}...")
     try:
+        # Use a connection (with engine.begin()) to drop the table with CASCADE.
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"DROP TABLE IF EXISTS public.{table_name} CASCADE"))
         df = pd.read_parquet(parquet_path, engine="pyarrow")
-        # Write to the database using pandas. Replace table if it exists.
+        # Write the new table to the database with if_exists="replace"
         df.to_sql(table_name, engine, schema="public",
                   if_exists="replace", index=False)
         print(
@@ -93,10 +94,9 @@ def main():
     print(f"Temporary directory created at {temp_dir}")
 
     try:
-        # Copy all Parquet files from the R2 bucket.
-        # This copies all files in the R2 bucket folder.
-        subprocess.run(["rclone", "copy", R2_BUCKET_WDI,
-                       temp_dir, "--checksum"], check=True)
+        # Copy all Parquet files from the R2 "sources" folder.
+        subprocess.run(["rclone", "copy", f"{R2_BUCKET_WDI}/sources",
+                        temp_dir, "--checksum"], check=True)
         parquet_files = [f for f in os.listdir(
             temp_dir) if f.endswith(".parquet")]
         if not parquet_files:
@@ -105,8 +105,9 @@ def main():
             if args.use_duckdb:
                 for file in parquet_files:
                     parquet_path = os.path.join(temp_dir, file)
-                    # Use the file basename (without extension) as the table name.
                     table_name = os.path.splitext(file)[0].replace("-", "")
+                    print(
+                        f"Starting DuckDB processing for table: {table_name}")
                     process_parquet_duckdb(parquet_path, table_name)
                 print("DuckDB population complete.")
             elif args.use_postgres:
@@ -114,6 +115,8 @@ def main():
                 for file in parquet_files:
                     parquet_path = os.path.join(temp_dir, file)
                     table_name = os.path.splitext(file)[0].replace("-", "")
+                    print(
+                        f"Starting PostgreSQL processing for table: {table_name}")
                     process_parquet_postgres(parquet_path, table_name, engine)
                 print("PostgreSQL population complete.")
     finally:

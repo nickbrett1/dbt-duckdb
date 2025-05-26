@@ -12,7 +12,7 @@ import shutil
 SOURCE = "https://databank.worldbank.org/data/download/WDI_CSV.zip"
 
 # Cloudflare R2 bucket destination for WDI data.
-# Parquet files are saved in the bucket root, while the raw ZIP is saved in the "raw" folder.
+# Parquet files are saved in the "sources" folder, while the raw ZIP is saved in the "raw" folder.
 R2_BUCKET_WDI = "r2:wdi"
 
 
@@ -90,8 +90,8 @@ def main():
         for file in os.listdir(temp_dir):
             if file.endswith(".parquet"):
                 local_file = os.path.join(temp_dir, file)
-                # Sync the parquet files to the root of the R2 bucket
-                sync_to_r2(local_file, R2_BUCKET_WDI)
+                # Sync the parquet files to the "sources" folder in the R2 bucket
+                sync_to_r2(local_file, f"{R2_BUCKET_WDI}/sources")
     finally:
         print("Cleaning up temporary files...")
         shutil.rmtree(temp_dir)

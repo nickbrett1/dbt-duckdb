@@ -39,7 +39,9 @@
 			"extensions": [
 				"bastienboutonnet.vscode-dbt",
 				"ritwickdey.LiveServer",
-				"CircleCI.circleci"
+				"CircleCI.circleci",
+				"innoverio.vscode-dbt-power-user",
+				"henriblancke.vscode-dbt-formatter"
 			]
 		}
 	},

@@ -1,5 +1,5 @@
 with
-    source as (select * from {{ source('wdi', 'wdicsv') }}),
+    source as (select * from {{ source('wdi', 'WDICSV') }}),
     renamed as (
         select
             {{ adapter.quote("Country Name") }},

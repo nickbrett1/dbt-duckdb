@@ -7,3 +7,4 @@ models:
 - name: stg_wdicsv
 - name: stg_wdiseries
 - name: stg_wdiseriestime
+- name: stg_population_data
