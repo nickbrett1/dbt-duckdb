@@ -142,12 +142,13 @@ def split_sql_dump(sql_dump_file: str, out_dir: str, max_statements: int = 6000)
 # Updated D1 functions: they now use a d1_mode string that is either "local" or "remote"
 def drop_mart_tables_from_d1(d1_mode: str) -> None:
     """
-    List tables from the Cloudflare D1 'wdi' database and drop all marts tables.
+    List tables from the Cloudflare D1 'wdi' database and drop all marts tables using
+    wrangler@3.103.2 as a workaround for workers-sdk/issues/8153.
     d1_mode should be "local" or "remote" which determines the flag passed to wrangler.
     """
     flag = "--local" if d1_mode == "local" else "--remote"
-    print("Listing tables in Cloudflare D1 database 'wdi'...")
-    list_tables_cmd = f"npx wrangler d1 execute wdi {flag} --sql \"SHOW TABLES;\""
+    print("Listing tables in Cloudflare D1 database 'wdi' using wrangler@3.103.2...")
+    list_tables_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --sql \"SHOW TABLES;\""
     result = subprocess.run(list_tables_cmd, shell=True,
                             capture_output=True, text=True)
     mart_tables = []
@@ -159,28 +160,28 @@ def drop_mart_tables_from_d1(d1_mode: str) -> None:
         print("No marts tables to drop in D1 database 'wdi'.")
         return
     for table in mart_tables:
-        drop_cmd = f"npx wrangler d1 execute wdi {flag} --sql \"DROP TABLE IF EXISTS {table};\" --yes"
+        drop_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --sql \"DROP TABLE IF EXISTS {table};\" --yes"
         subprocess.run(drop_cmd, shell=True, check=True)
         print(f"Dropped table {table} from D1 database 'wdi'.")
 
 
 def update_d1_from_dump(sql_dump_file: str, d1_mode: str):
-    print("Dropping marts tables from Cloudflare D1 database 'wdi'...")
+    print("Dropping marts tables from Cloudflare D1 database 'wdi' using wrangler@3.103.2...")
     drop_mart_tables_from_d1(d1_mode)
-    print("Updating Cloudflare D1 database 'wdi' using the SQL dump chunk...")
+    print("Updating Cloudflare D1 database 'wdi' using the SQL dump chunk with wrangler@3.103.2...")
     flag = "--local" if d1_mode == "local" else "--remote"
-    update_cmd = f"npx wrangler d1 execute wdi {flag} --file {sql_dump_file} --yes"
+    update_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
     print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
 
 
 def update_d1_chunk(sql_dump_file: str, d1_mode: str):
     """
-    Update Cloudflare D1 database by executing a single SQL dump chunk.
+    Update Cloudflare D1 database by executing a single SQL dump chunk using wrangler@3.103.2.
     This function does NOT drop marts tables.
     """
     flag = "--local" if d1_mode == "local" else "--remote"
-    update_cmd = f"npx wrangler d1 execute wdi {flag} --file {sql_dump_file} --yes"
+    update_cmd = f"npx wrangler@3.103.2 d1 execute wdi {flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
     print(f"Cloudflare D1 database 'wdi' updated using {sql_dump_file}.")
 
@@ -397,7 +398,12 @@ def main():
             print(
                 "Dropping marts tables from Cloudflare D1 database 'wdi' once before updates...")
             drop_mart_tables_from_d1(d1_mode)
-            for sql_file in sql_files:
+
+            total_chunks = len(sql_files)
+            print(
+                f"Updating Cloudflare D1 database using {total_chunks} SQL dump chunk(s)...")
+            for i, sql_file in enumerate(sql_files, 1):
+                print(f"Updating chunk {i}/{total_chunks}: {sql_file}")
                 update_d1_chunk(sql_file, d1_mode)
         else:
             print("No differences found in Parquet files; D1 export process skipped.")
