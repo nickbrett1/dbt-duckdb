@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 import os
-import duckdb
-import sqlite3
 import subprocess
+import sys
+import tempfile
+import sqlite3
+import pandas as pd
+import json
 import re
 import argparse
-import sys
-import filecmp
-import hashlib
-import pandas as pd
-import tempfile
-import json
+import duckdb
 
 
 def map_type(duck_type: str) -> str:
@@ -276,102 +274,87 @@ def load_and_sort_parquet(filename: str) -> pd.DataFrame:
     except Exception as e:
         print(f"Error reading {filename}: {e}")
         raise
-    # Sort the DataFrame by all columns to ensure deterministic order.
     sort_cols = df.columns.tolist()
     df = df.sort_values(by=sort_cols).reset_index(drop=True)
     return df
 
 
-def parquet_files_differ(local_dir: str, remote_dir: str) -> bool:
+def get_changed_mart_tables_from_parquet(local_dir: str, remote_dir: str) -> list:
     """
-    Compare local and remote Parquet files, tolerating small floating point differences.
+    Compare each local Parquet file with its counterpart in remote_dir.
+    Returns a list of table names (derived from the file name without ".parquet")
+    for which the files differ (or the remote file is missing).
     """
+    changed_tables = []
     local_files = sorted([f for f in os.listdir(
         local_dir) if f.endswith(".parquet")])
-    if not local_files:
-        print("No local Parquet files to compare.")
-        return False
-    tolerance_rel = 1e-5
-    tolerance_abs = 5e-4
     for f in local_files:
         local_path = os.path.join(local_dir, f)
         remote_path = os.path.join(remote_dir, f)
         if not os.path.exists(remote_path):
             print(f"Remote file is missing: {f}")
-            return True
+            changed_tables.append(f[:-8])  # remove ".parquet"
+            continue
         try:
             local_df = load_and_sort_parquet(local_path)
             remote_df = load_and_sort_parquet(remote_path)
         except Exception as e:
             print(f"Failed to load Parquet file {f}: {e}")
-            return True
+            changed_tables.append(f[:-8])
+            continue
         try:
             pd.testing.assert_frame_equal(
                 local_df, remote_df,
-                rtol=tolerance_rel, atol=tolerance_abs, check_exact=False
+                rtol=1e-5, atol=5e-4, check_exact=False
             )
         except AssertionError as e:
-            print(
-                f"Data mismatch in file: {f} beyond tolerances (rtol={tolerance_rel}, atol={tolerance_abs}).")
-            print(f"Local file: {local_path}")
-            print(f"Remote file: {remote_path}")
-            print("AssertionError:", e)
-            return True
-    print("All local Parquet files are within tolerances in the remote directory.")
-    return False
+            print(f"Data mismatch in file: {f}.")
+            changed_tables.append(f[:-8])
+    return changed_tables
 
 
-def parquet_changes_exist(parquet_dir: str) -> bool:
+def dump_table_from_sqlite(db_filename: str, table: str, output_file: str) -> None:
     """
-    Download Parquet files from R2 to a temporary directory and compare to local files.
-    Returns True if differences are detected.
+    Dumps only the specified table from the SQLite database.
     """
-    with tempfile.TemporaryDirectory() as remote_parquet_dir:
-        download_remote_parquet(remote_parquet_dir)
-        return parquet_files_differ(parquet_dir, remote_parquet_dir)
+    dump_cmd = f'sqlite3 {db_filename} ".dump {table}"'
+    result = subprocess.run(dump_cmd, shell=True,
+                            capture_output=True, text=True, check=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(result.stdout)
+    print(f"Dumped table {table} to {output_file}")
 
 
-def drop_mart_tables_from_sqlite(db_filename: str) -> None:
+# New per-table D1 functions
+
+def drop_mart_table_from_d1(table: str, d1_mode: str) -> None:
     """
-    List and drop all marts tables (names starting with 'fct_' or 'dim_') in SQLite.
+    Drop a single mart table from the D1 database using wrangler@latest.
     """
-    conn = sqlite3.connect(db_filename)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND (name LIKE 'fct_%' OR name LIKE 'dim_%');"
-    )
-    mart_tables = [row[0] for row in cursor.fetchall()]
-    if not mart_tables:
-        print("No marts tables to drop in SQLite database.")
-        conn.close()
-        return
-    for table in mart_tables:
-        cursor.execute(f"DROP TABLE IF EXISTS {table};")
-        print(f"Dropped table {table} from SQLite database.")
-    conn.commit()
-    conn.close()
+    flag = "--local" if d1_mode == "local" else "--remote"
+    drop_cmd = f"npx wrangler@latest d1 execute wdi {flag} --command \"DROP TABLE IF EXISTS {table};\" --yes"
+    subprocess.run(drop_cmd, shell=True, check=True)
+    print(f"Dropped table {table} from D1 database 'wdi'.")
 
 
-def update_sqlite_from_dump(db_filename: str, sql_dump_file: str):
+def update_d1_table_from_dump(sql_dump_file: str, d1_mode: str) -> None:
     """
-    Drop marts tables and update the SQLite database using the new SQL dump.
+    Update one table in D1 via a SQL dump file using wrangler@latest.
     """
-    print("Dropping marts tables from SQLite database...")
-    drop_mart_tables_from_sqlite(db_filename)
-    print("Updating SQLite database using the new SQL dump...")
-    update_cmd = f'sqlite3 {db_filename} ".read {sql_dump_file}"'
+    flag = "--local" if d1_mode == "local" else "--remote"
+    update_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {sql_dump_file} --yes"
     subprocess.run(update_cmd, shell=True, check=True)
-    print("SQLite database updated using the new SQL dump.")
+    print(f"Updated D1 table via dump file {sql_dump_file}.")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=("Exports DuckDB marts tables as Parquet files, "
-                     "checks differences in Parquet files on R2, and if differences are detected "
-                     "(or if --force-d1 is provided), triggers the D1 export process and syncs the files back to R2.")
+        description=("Exports DuckDB marts tables as Parquet files, compares them with Parquet files on R2, "
+                     "and if differences are detected for specific tables (or if --force is provided), "
+                     "syncs the corresponding tables to R2 and updates them in D1.")
     )
-    parser.add_argument("--force-d1", action="store_true",
-                        help="Force D1 export process.")
+    parser.add_argument("--force", action="store_true",
+                        help="Force export process for all tables.")
     parser.add_argument("--local-d1", action="store_true",
                         help="Use local D1 database (adds --local to wrangler commands).")
     parser.add_argument("--remote-d1", action="store_true",
@@ -382,61 +365,71 @@ def main():
                         help="Only export 1% of rows for D1 export (for testing purposes).")
     args = parser.parse_args()
 
-    # Require that exactly one of --local-d1 or --remote-d1 be specified.
     if (args.local_d1 and args.remote_d1) or (not args.local_d1 and not args.remote_d1):
         print("Error: Please specify exactly one of --local-d1 or --remote-d1.")
         sys.exit(1)
-
-    # Set the d1_mode based on the flag.
     d1_mode = "local" if args.local_d1 else "remote"
-
-    duckdb_filename = "wdi.duckdb"  # Existing DuckDB file
+    duckdb_filename = "wdi.duckdb"
 
     with tempfile.TemporaryDirectory() as parquet_dir, tempfile.TemporaryDirectory() as sqlite_dir:
         print(f"Using temporary directory for Parquet files: {parquet_dir}")
         print(f"Using temporary directory for SQLite files: {sqlite_dir}")
 
-        # Step 1: Export local Parquet files.
+        # Step 1: Export all mart tables from DuckDB as local Parquet files.
         export_mart_tables_parquet(duckdb_filename, parquet_dir)
 
-        # Step 2: Check for differences in Parquet files on R2.
-        differences = parquet_changes_exist(parquet_dir)
-        if differences or args.force_d1:
-            print("Differences detected (or forced).")
-            print("Syncing Parquet files back to R2 and triggering D1 export process.")
-            subprocess.run(
-                ["rclone", "copy", parquet_dir, "r2:wdi",
-                 "--include", "*.parquet", "--checksum"],
-                check=True
-            )
+        # Step 2: Download remote Parquet files to a temporary folder.
+        with tempfile.TemporaryDirectory() as remote_parquet_dir:
+            download_remote_parquet(remote_parquet_dir)
+            # Get list of changed mart tables.
+            changed_tables = get_changed_mart_tables_from_parquet(
+                parquet_dir, remote_parquet_dir)
 
+        if not changed_tables and not args.force:
+            print("No changes detected in mart tables; D1 update process skipped.")
+        else:
+            # If forced, update ALL tables; otherwise, update only changed ones.
+            if args.force:
+                parquet_files = [f for f in os.listdir(
+                    parquet_dir) if f.endswith(".parquet")]
+                tables_to_update = [os.path.splitext(
+                    f)[0] for f in parquet_files]
+                print(
+                    f"Force update enabled: All tables will be updated: {', '.join(tables_to_update)}")
+            else:
+                tables_to_update = changed_tables
+                print(
+                    f"Changed mart tables detected: {', '.join(changed_tables)}")
+
+            # Sync only the relevant Parquet files to R2.
+            for f in os.listdir(parquet_dir):
+                table = f[:-8]  # remove '.parquet'
+                if args.force or table in tables_to_update:
+                    print(f"Syncing Parquet file for table {table}...")
+                    subprocess.run(
+                        ["rclone", "copy", os.path.join(parquet_dir, f), "r2:wdi",
+                         "--include", f],
+                        check=True
+                    )
             if args.ignore_d1:
                 print("Ignoring D1 export process as per flag. Exiting now.")
                 return
 
             # Step 3: Export to SQLite and dump clean SQL.
             sqlite_filename = os.path.join(sqlite_dir, "wdi.sqlite3")
-            sql_dump_file = os.path.join(sqlite_dir, "wdi.sql")
-            print(
-                f"Exporting to SQLite database in temporary directory: {sqlite_dir}")
+            dump_sql_file = os.path.join(sqlite_dir, "wdi.sql")
+            print(f"Exporting to SQLite database in {sqlite_dir} ...")
             export_duckdb_to_sqlite(
                 duckdb_filename, sqlite_filename, sample=args.sample_d1)
-            dump_and_clean_sqlite(sqlite_filename, sql_dump_file)
-            sql_files = split_sql_dump(
-                sql_dump_file, sqlite_dir, max_statements=6000)
+            dump_and_clean_sqlite(sqlite_filename, dump_sql_file)
 
-            print(
-                "Dropping marts tables from Cloudflare D1 database 'wdi' once before updates...")
-            drop_mart_tables_from_d1(d1_mode)
-
-            total_chunks = len(sql_files)
-            print(
-                f"Updating Cloudflare D1 database using {total_chunks} SQL dump chunk(s)...")
-            for i, sql_file in enumerate(sql_files, 1):
-                print(f"Updating chunk {i}/{total_chunks}: {sql_file}")
-                update_d1_chunk(sql_file, d1_mode)
-        else:
-            print("No differences found in Parquet files; D1 export process skipped.")
+            # For each table to update, dump just that table and update D1.
+            for table in tables_to_update:
+                print(f"Processing table {table} for D1 update...")
+                table_dump_file = os.path.join(sqlite_dir, f"{table}.sql")
+                dump_table_from_sqlite(sqlite_filename, table, table_dump_file)
+                drop_mart_table_from_d1(table, d1_mode)
+                update_d1_table_from_dump(table_dump_file, d1_mode)
 
         print("Process complete.")
 

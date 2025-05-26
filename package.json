@@ -7,8 +7,8 @@
     "download:population": "doppler run -- python download_population.py",
     "download:wdi": "doppler run -- python download_wdi.py",
     "dev:export": "doppler run -- python duckdbexport.py --local-d1 --sample-d1",
-    "dev:export:full:force": "doppler run -- python duckdbexport.py --local-d1 --force-d1",
-    "dev:export:force-d1": "doppler run -- python duckdbexport.py --force-d1 --local-d1 --sample-d1",
+    "dev:export:full:force": "doppler run -- python duckdbexport.py --local-d1 --force",
+    "dev:export:force": "doppler run -- python duckdbexport.py --force --local-d1 --sample-d1",
     "dev:export:ignore-d1": "doppler run -- python duckdbexport.py --ignore-d1 --local-d1"
   },
   "dependencies": {}
