@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # filepath: /workspaces/dbt-duckdb/export_parquet.py
 import os
-import tempfile
 import duckdb
 import json
 import argparse
@@ -40,38 +39,33 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str) -> list:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export DuckDB mart tables to Parquet files."
+        description=(
+            "Export DuckDB mart tables to Parquet files.\n\n"
+            "The exported files are saved into the specified output directory. "
+            "This directory will contain a file named 'exported_files.json' which is a JSON array "
+            "listing the full paths to each exported Parquet file."
+        )
     )
     parser.add_argument(
-        "json_output", help="File to write JSON list of exported files"
-    )
-    parser.add_argument(
-        "--output-dir", help="Directory to export Parquet files"
+        "output_dir", help="Directory to export Parquet files (will contain exported_files.json)"
     )
     args = parser.parse_args()
 
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+
     duckdb_filename = "wdi.duckdb"
-    if args.output_dir:
-        output_dir = args.output_dir
-        os.makedirs(output_dir, exist_ok=True)
-        exported_files = export_mart_tables_parquet(
-            duckdb_filename, output_dir)
-        print(f"Using specified output directory: {output_dir}")
-    else:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_dir = temp_dir
-            exported_files = export_mart_tables_parquet(
-                duckdb_filename, output_dir)
-            print(
-                f"Using temporary directory for Parquet export: {output_dir}")
+    exported_files = export_mart_tables_parquet(duckdb_filename, output_dir)
+    print(f"Using output directory: {output_dir}")
 
     print("Exported files:")
     for f in exported_files:
         print(f)
 
-    with open(args.json_output, "w", encoding="utf-8") as json_file:
+    json_output_file = os.path.join(output_dir, "exported_files.json")
+    with open(json_output_file, "w", encoding="utf-8") as json_file:
         json.dump(exported_files, json_file)
-    print(f"JSON output written to {args.json_output}")
+    print(f"JSON output written to {json_output_file}")
 
 
 if __name__ == '__main__':

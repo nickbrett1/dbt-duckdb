@@ -123,12 +123,12 @@ jobs:
       - run:
           name: Export mart tables to Parquet
           command: |
-            python export_parquet.py exported_files.json
+            python export_parquet.py --output-dir export
       # Step 2: Determine changes and sync remote Parquet files
       - run:
           name: Sync changed Parquet files to R2
           command: |
-            python sync_remote_parquet.py exported_files.json changed_tables.json
+            python sync_remote_parquet.py export/exported_files.json changed_tables.json
       # Step 3: Update D1 using changed tables (if any)
       - run:
           name: Update D1 tables
