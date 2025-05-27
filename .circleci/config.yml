@@ -73,21 +73,17 @@ jobs:
       - restore_cache:
           keys:
             - pip-cache-{{ checksum "requirements.txt" }}
-      # Install pip modules
       - run:
           name: Install pip modules
           command: pip install -r requirements.txt
-      # Save pip cache
       - save_cache:
           paths:
             - ~/.cache/pip
           key: pip-cache-{{ checksum "requirements.txt" }}
-
       # Run the populate script (which reads from Cloudflare R2)
       - run:
           name: Populate Databases
           command: python populate.py --use-duckdb
-
       # Run dbt deps inside the wdi directory
       - run:
           name: Run dbt deps
@@ -95,7 +91,6 @@ jobs:
             pushd wdi
             dbt deps
             popd
-
       # Run dbt run inside the wdi directory
       - run:
           name: Run dbt run
@@ -103,7 +98,6 @@ jobs:
             pushd wdi
             dbt run --target prod
             popd
-
       # Generate dbt docs inside the wdi directory
       - run:
           name: Generate dbt docs
@@ -111,29 +105,39 @@ jobs:
             pushd wdi
             dbt docs generate --target prod --static
             popd
-
       # Upload the generated static_index.html to R2 docs folder
       - run:
           name: Upload dbt docs static index to R2
           command: rclone copy wdi/target/static_index.html r2:wdi/docs --checksum
-
       # Install sqlite3 so that the sqlite3 command is available for export
       - run:
           name: Install sqlite3
           command: sudo apt-get update && sudo apt-get install -y sqlite3
-
       # Install latest Node.js (LTS)
       - run:
           name: Install latest Node.js
           command: |
             curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
             sudo apt-get install -y nodejs
-
-      # Run the DuckDB to SQLite export script
+      # Step 1: Export DuckDB marts tables as Parquet files
       - run:
-          name: Export DuckDB to R2 and D1
-          command: python duckdbexport.py --remote-d1
-
+          name: Export mart tables to Parquet
+          command: |
+            python export_parquet.py exported_files.json --output-dir dev_data
+      # Step 2: Determine changes and sync remote Parquet files
+      - run:
+          name: Sync changed Parquet files to R2
+          command: |
+            python sync_remote_parquet.py exported_files.json changed_tables.json
+      # Step 3: Update D1 using changed tables (if any)
+      - run:
+          name: Update D1 tables
+          command: |
+            if [ -s changed_tables.json ]; then
+              python update_d1.py changed_tables.json --remote
+            else
+              echo "No changes detected; skipping D1 update."
+            fi
 
 workflows:
   download_transform_load:

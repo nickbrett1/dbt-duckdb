@@ -6,10 +6,9 @@
     "populate:postgres": "doppler run -- python populate.py --use-postgres",
     "download:population": "doppler run -- python download_population.py",
     "download:wdi": "doppler run -- python download_wdi.py",
-    "dev:export": "doppler run -- python duckdbexport.py --local-d1 --sample-d1",
-    "dev:export:full:force": "doppler run -- python duckdbexport.py --local-d1 --force",
-    "dev:export:force": "doppler run -- python duckdbexport.py --force --local-d1 --sample-d1",
-    "dev:export:ignore-d1": "doppler run -- python duckdbexport.py --ignore-d1 --local-d1"
+    "load:export_parquet": "doppler run -- python export_parquet.py dev_data/exported_files.json --output-dir dev_data ",
+    "load:sync_parquet": "doppler run -- python sync_remote_parquet.py dev_data/exported_files.json dev_data/changed_tables.json --no-updates",
+    "load:update_d1": "doppler run -- python update_d1.py dev_data/changed_tables.json --local --sample"
   },
   "dependencies": {}
 }

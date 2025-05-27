@@ -9,3 +9,4 @@ wdi.hash
 node_modules/
 .wrangler
 __pycache__/
+dev_data
