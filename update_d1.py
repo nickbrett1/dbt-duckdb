@@ -100,8 +100,19 @@ def drop_mart_table_from_d1(table: str, d1_mode: str) -> None:
 def update_d1_table_from_dump(sql_dump_file: str, d1_mode: str) -> None:
     flag = "--local" if d1_mode == "local" else "--remote"
     update_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {sql_dump_file} --yes"
-    subprocess.run(update_cmd, shell=True, check=True)
-    print(f"Updated D1 table via dump file {sql_dump_file}.")
+    max_retries = 3
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            subprocess.run(update_cmd, shell=True, check=True)
+            print(f"Updated D1 table via dump file {sql_dump_file}.")
+            return
+        except subprocess.CalledProcessError as e:
+            attempt += 1
+            print(
+                f"Attempt {attempt} of {max_retries} failed for updating D1 table via dump file {sql_dump_file}. Error: {e}")
+            if attempt == max_retries:
+                raise
 
 
 def main():

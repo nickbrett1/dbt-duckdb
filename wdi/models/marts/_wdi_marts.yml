@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: fct_wdi_history
-    description: "Fact table containing WDI historical data in long format, unpivoted from the stg_wdicsv table."
+    description: "Fact table containing WDI historical data in long format, referenced from the stg_wdicsv table."
     columns:
       - name: country_code
         description: "ISO country code (three-letter)."
