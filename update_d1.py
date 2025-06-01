@@ -8,6 +8,7 @@ import duckdb
 import re
 import json
 import argparse
+import time
 
 
 def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: bool = False, tables_to_export: list = None) -> None:
@@ -97,6 +98,30 @@ def drop_mart_table_from_d1(table: str, d1_mode: str) -> None:
     print(f"Dropped table {table} from D1 database 'wdi'.")
 
 
+def split_file(file_path: str, max_lines: int = 50000) -> list:
+    """
+    Splits the file at file_path into chunks with up to max_lines each.
+    Returns a list of chunk file paths. If the file is short enough,
+    returns a list with the original file.
+    """
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    total_lines = len(lines)
+    if total_lines <= max_lines:
+        return [file_path]
+    chunk_files = []
+    base, ext = os.path.splitext(file_path)
+    for i in range(0, total_lines, max_lines):
+        chunk_lines = lines[i:i + max_lines]
+        chunk_file = f"{base}_chunk_{i//max_lines}{ext}"
+        with open(chunk_file, "w", encoding="utf-8") as cf:
+            cf.writelines(chunk_lines)
+        chunk_files.append(chunk_file)
+    print(
+        f"Split {file_path} into {len(chunk_files)} chunks (threshold = {max_lines} lines).")
+    return chunk_files
+
+
 def update_d1_table_from_dump(sql_dump_file: str, d1_mode: str) -> None:
     flag = "--local" if d1_mode == "local" else "--remote"
     update_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {sql_dump_file} --yes"
@@ -105,7 +130,7 @@ def update_d1_table_from_dump(sql_dump_file: str, d1_mode: str) -> None:
     while attempt < max_retries:
         try:
             subprocess.run(update_cmd, shell=True, check=True)
-            print(f"Updated D1 table via dump file {sql_dump_file}.")
+            print(f"Updated D1 table using dump file {sql_dump_file}.")
             return
         except subprocess.CalledProcessError as e:
             attempt += 1
@@ -113,6 +138,20 @@ def update_d1_table_from_dump(sql_dump_file: str, d1_mode: str) -> None:
                 f"Attempt {attempt} of {max_retries} failed for updating D1 table via dump file {sql_dump_file}. Error: {e}")
             if attempt == max_retries:
                 raise
+            else:
+                wait_time = 5 * attempt
+                print(f"Waiting for {wait_time} seconds before retrying...")
+                time.sleep(wait_time)
+
+
+def update_d1_table_from_dump_chunks(sql_dump_file: str, d1_mode: str, max_lines: int = 50000) -> None:
+    """
+    Splits the sql_dump_file into chunks (if necessary) and then updates D1
+    by executing each chunk sequentially.
+    """
+    chunk_files = split_file(sql_dump_file, max_lines=max_lines)
+    for chunk in chunk_files:
+        update_d1_table_from_dump(chunk, d1_mode)
 
 
 def main():
@@ -145,7 +184,9 @@ def main():
             table_dump_file = os.path.join(sqlite_dir, f"{table}.sql")
             dump_table_from_sqlite(sqlite_filename, table, table_dump_file)
             drop_mart_table_from_d1(table, d1_mode)
-            update_d1_table_from_dump(table_dump_file, d1_mode)
+            # Use our new function that handles splitting if the dump file is huge.
+            update_d1_table_from_dump_chunks(
+                table_dump_file, d1_mode, max_lines=50000)
         print("D1 update process complete.")
 
 
