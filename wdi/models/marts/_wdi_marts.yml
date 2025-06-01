@@ -150,3 +150,6 @@ models:
         description: "Average change in indicator values between 1960 and 2024."
       - name: total_indicator_change
         description: "Aggregate change in indicator values between 1960 and 2024."
+    
+  - name: fct_indicator_coverage
+    description: "Fact table summarising indicator coverage across countries."
