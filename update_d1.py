@@ -186,7 +186,7 @@ def main():
             drop_mart_table_from_d1(table, d1_mode)
             # Use our new function that handles splitting if the dump file is huge.
             update_d1_table_from_dump_chunks(
-                table_dump_file, d1_mode, max_lines=50000)
+                table_dump_file, d1_mode, max_lines=250000)
         print("D1 update process complete.")
 
 
