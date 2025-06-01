@@ -16,7 +16,6 @@
 	],
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
-		"ghcr.io/eitsupi/devcontainer-features/duckdb-cli:1": {},
 		"ghcr.io/itsmechlark/features/postgresql:1": {
 			"version": "latest"
 		},
@@ -41,14 +40,13 @@
 				"ritwickdey.LiveServer",
 				"CircleCI.circleci",
 				"innoverio.vscode-dbt-power-user",
-				"henriblancke.vscode-dbt-formatter"
+				"henriblancke.vscode-dbt-formatter",
+				"google.geminicodeassist"
 			]
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// dbt-core, dbt-postgres and dbt-duckdb are installed here early so it's picked up by the dbt vscode extension.
-	"postCreateCommand": "/bin/bash -c 'if ! doppler me >/dev/null 2>&1; then doppler login --no-check-version --no-timeout --yes && doppler setup --no-interactive; fi; sudo bash .devcontainer/setup-postgres.sh; pip install --upgrade pip; pip install dbt-core dbt-postgres dbt-duckdb; pip3 install --user -r requirements.txt; yes | npx wrangler@latest login'"
-	// Configure tool-specific properties.
+	"postCreateCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-create-setup.sh" // Configure tool-specific properties.
 	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
