@@ -5,7 +5,7 @@ echo "Starting post-create setup..."
 
 # dbt-core, dbt-postgres and dbt-duckdb are installed here early so it's picked up by the dbt vscode extension.
 pip install --upgrade pip
-pip install dbt-core dbt-postgres dbt-duckdb
+pip install dbt-core dbt-postgres dbt-duckdb duckcli
 pip3 install --user -r requirements.txt
 yes | npx npx wrangler login --browser=false --callback-host=0.0.0.0 --callback-port=8976 | stdbuf -oL sed 's/0\.0\.0\.0/localhost/g'
 echo "INFO: Wrangler login process initiated."
