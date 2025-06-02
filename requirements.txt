@@ -110,7 +110,7 @@ referencing==0.36.2
 requests==2.32.3
 rfc3339-validator==0.1.4
 rfc3986-validator==0.1.1
-rpds-py==0.24.0
+rpds-py==0.25.1
 Send2Trash==1.8.3
 setuptools==80.3.1
 shandy-sqlfmt==0.26.0
