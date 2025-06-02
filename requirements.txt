@@ -18,7 +18,7 @@ colorama==0.4.6
 comm==0.2.2
 daff==1.4.2
 dbt-adapters==1.14.8
-dbt-common==1.23.0
+dbt-common==1.25.0
 dbt-core==1.9.6
 dbt-duckdb==1.9.3
 dbt-extractor==0.6.0
