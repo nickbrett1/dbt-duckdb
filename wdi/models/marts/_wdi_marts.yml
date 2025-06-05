@@ -1,6 +1,8 @@
 version: 2
 
 models:
+  - name: agg_wdi_data_points_by_year
+  
   - name: fct_wdi_history
     description: "Fact table containing WDI historical data in long format, referenced from the stg_wdicsv table."
     columns:

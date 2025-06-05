@@ -15,7 +15,8 @@ def download_remote_parquet(remote_dir: str) -> None:
         [
             "rclone", "copy", "r2:wdi", remote_dir,
             "--include", "fct_*.parquet",
-            "--include", "dim_*.parquet"
+            "--include", "dim_*.parquet",
+            "--include", "agg_*.parquet"
         ],
         check=True
     )
