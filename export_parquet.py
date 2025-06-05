@@ -9,7 +9,7 @@ import argparse
 def export_mart_tables_parquet(duckdb_filename: str, output_dir: str) -> list:
     duck_conn = duckdb.connect(duckdb_filename, read_only=True)
     tables = duck_conn.execute("SHOW TABLES;").fetchall()
-    mart_prefixes = ("fct_", "dim_")
+    mart_prefixes = ("fct_", "dim_", "agg_")
     exported_files = []
     print("Exporting marts tables from DuckDB to local Parquet files:")
     for row in tables:
