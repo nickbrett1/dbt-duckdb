@@ -1,1 +1,1 @@
-A repo for experimenting with [dbt using DuckDb](https://docs.getdbt.com/guides/duckdb?step=1)
+A repo for experimenting with [dbt using DuckDb](https://fintechnick.com/projects/dbt-duckdb)
