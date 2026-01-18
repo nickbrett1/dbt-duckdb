@@ -148,3 +148,4 @@ workflows:
           requires:
             - download_population
             - download_wdi
+          context: common
