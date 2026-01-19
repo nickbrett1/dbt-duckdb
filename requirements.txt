@@ -15,7 +15,7 @@ cffi==1.17.1
 charset-normalizer==3.4.2
 click==8.1.8
 colorama==0.4.6
-comm==0.2.2
+comm==0.2.3
 daff==1.4.2
 dbt-adapters==1.16.0
 dbt-common==1.25.0
