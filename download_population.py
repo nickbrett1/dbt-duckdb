@@ -4,52 +4,82 @@ import os
 import subprocess
 import tempfile
 import argparse
-import requests
 import pandas as pd
 import shutil
+import asyncio
+import httpx
 
 # World Bank API for total population (SP.POP.TOTL) for 2022.
-POPULATION_SERVICE_URL = "http://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL?format=json&date=2022"
+POPULATION_SERVICE_URL = "https://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL?format=json&date=2022"
 
 # Cloudflare R2 bucket destination for population data (stored as Parquet).
 # The Parquet file will be synced to the "sources" folder.
 R2_BUCKET_POP = "r2:wdi"
 
 
-def fetch_population_data():
+async def fetch_page(client, page, per_page):
+    url = f"{POPULATION_SERVICE_URL}&page={page}&per_page={per_page}"
+    response = await client.get(url)
+    response.raise_for_status()
+    data = response.json()
+    # The second element has the data records.
+    records = data[1] if len(data) > 1 else []
+    return records
+
+
+async def fetch_population_data_async():
     print("Fetching population data from World Bank API...")
     pop_list = []
     try:
         page = 1
         per_page = 1000  # adjust as necessary
-        total_pages = None
-        while True:
+
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            # Fetch first page to get total pages
             url = f"{POPULATION_SERVICE_URL}&page={page}&per_page={per_page}"
-            response = requests.get(url)
+            response = await client.get(url)
             response.raise_for_status()
             data = response.json()
-            # The first part of the response contains pagination info.
-            if total_pages is None:
-                pagination = data[0]
-                total_pages = pagination.get("pages", 1)
-                print(f"Total pages to fetch: {total_pages}")
-            # The second element has the data records.
+
+            if not data:
+                return []
+
+            pagination = data[0]
+            total_pages = pagination.get("pages", 1)
+            print(f"Total pages to fetch: {total_pages}")
+
+            # Get records from first page
             records = data[1] if len(data) > 1 else []
-            print(
-                f"Retrieved {len(records)} records from page {page} of {total_pages}.")
+            print(f"Retrieved {len(records)} records from page {page} of {total_pages}.")
             pop_list.extend([
-                {"country_code": row.get(
-                    "countryiso3code"), "population": row.get("value")}
+                {"country_code": row.get("countryiso3code"), "population": row.get("value")}
                 for row in records if row.get("countryiso3code") is not None
             ])
-            if page >= total_pages:
-                break
-            page += 1
+
+            # Fetch remaining pages concurrently
+            if total_pages > 1:
+                tasks = []
+                for p in range(2, total_pages + 1):
+                    tasks.append(fetch_page(client, p, per_page))
+
+                results = await asyncio.gather(*tasks)
+
+                for i, records in enumerate(results):
+                    current_page = i + 2
+                    print(f"Retrieved {len(records)} records from page {current_page} of {total_pages}.")
+                    pop_list.extend([
+                        {"country_code": row.get("countryiso3code"), "population": row.get("value")}
+                        for row in records if row.get("countryiso3code") is not None
+                    ])
+
         print(f"Total population data records: {len(pop_list)}")
         return pop_list
     except Exception as e:
         print(f"Error fetching population data: {e}")
         return []
+
+def fetch_population_data():
+    return asyncio.run(fetch_population_data_async())
 
 
 def save_population_parquet(pop_list, dest_file):
