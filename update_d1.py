@@ -104,19 +104,33 @@ def split_file(file_path: str, max_lines: int = 50000) -> list:
     Returns a list of chunk file paths. If the file is short enough,
     returns a list with the original file.
     """
+    # Memory-efficiently count the number of lines
     with open(file_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    total_lines = len(lines)
+        total_lines = sum(1 for _ in f)
+
     if total_lines <= max_lines:
         return [file_path]
+
     chunk_files = []
     base, ext = os.path.splitext(file_path)
-    for i in range(0, total_lines, max_lines):
-        chunk_lines = lines[i:i + max_lines]
-        chunk_file = f"{base}_chunk_{i//max_lines}{ext}"
-        with open(chunk_file, "w", encoding="utf-8") as cf:
-            cf.writelines(chunk_lines)
-        chunk_files.append(chunk_file)
+    chunk_index = 0
+    with open(file_path, "r", encoding="utf-8") as f:
+        chunk_lines = []
+        for line in f:
+            chunk_lines.append(line)
+            if len(chunk_lines) == max_lines:
+                chunk_file = f"{base}_chunk_{chunk_index}{ext}"
+                with open(chunk_file, "w", encoding="utf-8") as cf:
+                    cf.writelines(chunk_lines)
+                chunk_files.append(chunk_file)
+                chunk_lines = []
+                chunk_index += 1
+        if chunk_lines:
+            chunk_file = f"{base}_chunk_{chunk_index}{ext}"
+            with open(chunk_file, "w", encoding="utf-8") as cf:
+                cf.writelines(chunk_lines)
+            chunk_files.append(chunk_file)
+
     print(
         f"Split {file_path} into {len(chunk_files)} chunks (threshold = {max_lines} lines).")
     return chunk_files
