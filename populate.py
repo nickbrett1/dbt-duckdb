@@ -22,11 +22,10 @@ POSTGRES_PORT = 5432
 DUCKDB_DATABASE = f"{POSTGRES_DB}.duckdb"
 
 
-def process_parquet_duckdb(parquet_path, table_name):
+def process_parquet_duckdb(parquet_path, table_name, con):
     print(
         f"Processing table {table_name} in DuckDB from file {parquet_path}...")
 
-    con = duckdb.connect(DUCKDB_DATABASE)
     con.execute("CREATE SCHEMA IF NOT EXISTS public")
     query = f"""
     CREATE TABLE IF NOT EXISTS public.{table_name} AS
@@ -40,7 +39,6 @@ def process_parquet_duckdb(parquet_path, table_name):
     else:
         print(
             f"Table public.{table_name} loaded with {count} rows from {parquet_path}.")
-    con.close()
 
 
 def process_parquet_postgres(parquet_path, table_name, engine):
@@ -103,12 +101,16 @@ def main():
             print("No Parquet files found in local copy.")
         else:
             if args.use_duckdb:
-                for file in parquet_files:
-                    parquet_path = os.path.join(temp_dir, file)
-                    table_name = os.path.splitext(file)[0].replace("-", "")
-                    print(
-                        f"Starting DuckDB processing for table: {table_name}")
-                    process_parquet_duckdb(parquet_path, table_name)
+                con = duckdb.connect(DUCKDB_DATABASE)
+                try:
+                    for file in parquet_files:
+                        parquet_path = os.path.join(temp_dir, file)
+                        table_name = os.path.splitext(file)[0].replace("-", "")
+                        print(
+                            f"Starting DuckDB processing for table: {table_name}")
+                        process_parquet_duckdb(parquet_path, table_name, con)
+                finally:
+                    con.close()
                 print("DuckDB population complete.")
             elif args.use_postgres:
                 engine = setup_postgres_engine()
