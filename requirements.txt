@@ -100,7 +100,7 @@ pydantic==2.11.5
 pydantic_core==2.33.2
 Pygments==2.19.2
 python-dateutil==2.9.0.post0
-python-json-logger==3.3.0
+python-json-logger==4.0.0
 python-slugify==8.0.4
 pytimeparse==1.1.8
 pytz==2025.2
