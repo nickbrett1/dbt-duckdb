@@ -45,14 +45,23 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
         create_stmt = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(columns_def)});'
         sqlite_conn.execute(create_stmt)
         query = f"SELECT * FROM {table_name}" if not sample else f"SELECT * FROM {table_name} WHERE random() < 0.01"
-        rows = duck_conn.execute(query).fetchall()
-        if not rows:
+        cursor = duck_conn.execute(query)
+        chunk_size = 50000
+        total_rows = 0
+        placeholders = ", ".join(["?"] * len(columns_info))
+        insert_stmt = f'INSERT INTO "{table_name}" VALUES ({placeholders});'
+
+        while True:
+            rows = cursor.fetchmany(chunk_size)
+            if not rows:
+                break
+            sqlite_conn.executemany(insert_stmt, rows)
+            total_rows += len(rows)
+
+        if total_rows == 0:
             print(f'Warning: Table "{table_name}" has no rows.')
         else:
-            placeholders = ", ".join(["?"] * len(columns_info))
-            insert_stmt = f'INSERT INTO "{table_name}" VALUES ({placeholders});'
-            sqlite_conn.executemany(insert_stmt, rows)
-            print(f'Inserted {len(rows)} rows into "{table_name}".')
+            print(f'Inserted {total_rows} rows into "{table_name}".')
         sqlite_conn.commit()
     duck_conn.close()
     sqlite_conn.close()
