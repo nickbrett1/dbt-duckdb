@@ -9,6 +9,7 @@ import re
 import json
 import argparse
 import time
+from itertools import islice
 
 
 def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: bool = False, tables_to_export: list = None) -> None:
@@ -113,18 +114,38 @@ def split_file(file_path: str, max_lines: int = 50000) -> list:
     Returns a list of chunk file paths. If the file is short enough,
     returns a list with the original file.
     """
-    # Memory-efficiently count the number of lines
-    with open(file_path, "r", encoding="utf-8") as f:
-        total_lines = sum(1 for _ in f)
-
-    if total_lines <= max_lines:
-        return [file_path]
-
-    chunk_files = []
     base, ext = os.path.splitext(file_path)
-    chunk_index = 0
+    chunk_files = []
+
     with open(file_path, "r", encoding="utf-8") as f:
-        chunk_lines = []
+        # Read the first batch of lines
+        chunk_lines = list(islice(f, max_lines))
+
+        # If we reached EOF and haven't filled the chunk, or just filled it exactly with no more lines
+        if len(chunk_lines) < max_lines:
+            return [file_path]
+
+        # Check if there is at least one more line
+        try:
+            next_line = next(f)
+        except StopIteration:
+            # File has exactly max_lines. No need to split.
+            return [file_path]
+
+        # If we are here, we have max_lines + 1 lines (at least). We must split.
+        chunk_index = 0
+
+        # Write the first chunk (from the initial buffer)
+        chunk_file = f"{base}_chunk_{chunk_index}{ext}"
+        with open(chunk_file, "w", encoding="utf-8") as cf:
+            cf.writelines(chunk_lines)
+        chunk_files.append(chunk_file)
+        chunk_index += 1
+
+        # Start the next chunk with the one extra line we read
+        chunk_lines = [next_line]
+
+        # Continue reading the rest of the file
         for line in f:
             chunk_lines.append(line)
             if len(chunk_lines) == max_lines:
@@ -134,6 +155,8 @@ def split_file(file_path: str, max_lines: int = 50000) -> list:
                 chunk_files.append(chunk_file)
                 chunk_lines = []
                 chunk_index += 1
+
+        # Write any remaining lines
         if chunk_lines:
             chunk_file = f"{base}_chunk_{chunk_index}{ext}"
             with open(chunk_file, "w", encoding="utf-8") as cf:
