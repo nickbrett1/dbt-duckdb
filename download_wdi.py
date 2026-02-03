@@ -45,6 +45,16 @@ def sync_to_r2(local_path, r2_bucket):
         return True
 
 
+def sync_directory_to_r2(local_dir, r2_bucket, include_pattern=None):
+    print(f"Syncing files from {local_dir} to {r2_bucket}...")
+    cmd = ["rclone", "copy", local_dir, r2_bucket, "--checksum"]
+    if include_pattern:
+        cmd.extend(["--include", include_pattern])
+
+    subprocess.run(cmd, check=True)
+    print(f"Synced {local_dir} to {r2_bucket}.")
+
+
 def unzip_file(zip_path, dest_dir):
     print("Unzipping file...")
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -87,11 +97,10 @@ def main():
         # Sync the raw ZIP to the "raw" folder within the R2 bucket
         sync_to_r2(raw_zip, f"{R2_BUCKET_WDI}/raw")
         process_wdi_data(raw_zip, temp_dir)
-        for file in os.listdir(temp_dir):
-            if file.endswith(".parquet"):
-                local_file = os.path.join(temp_dir, file)
-                # Sync the parquet files to the "sources" folder in the R2 bucket
-                sync_to_r2(local_file, f"{R2_BUCKET_WDI}/sources")
+
+        # Sync the parquet files to the "sources" folder in the R2 bucket
+        sync_directory_to_r2(
+            temp_dir, f"{R2_BUCKET_WDI}/sources", include_pattern="*.parquet")
     finally:
         print("Cleaning up temporary files...")
         shutil.rmtree(temp_dir)
