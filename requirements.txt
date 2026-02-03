@@ -61,7 +61,7 @@ jupyter_server_terminals==0.5.4
 jupyterlab==4.4.3
 jupyterlab_git==0.51.1
 jupyterlab_pygments==0.3.0
-jupyterlab_server==2.27.3
+jupyterlab_server==2.28.0
 leather==0.4.0
 MarkupSafe==3.0.3
 mashumaro==3.14
