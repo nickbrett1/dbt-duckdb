@@ -58,9 +58,15 @@ async def fetch_population_data_async():
 
             # Fetch remaining pages concurrently
             if total_pages > 1:
+                semaphore = asyncio.Semaphore(10)  # Limit concurrent requests
+
+                async def fetch_with_semaphore(p):
+                    async with semaphore:
+                        return await fetch_page(client, p, per_page)
+
                 tasks = []
                 for p in range(2, total_pages + 1):
-                    tasks.append(fetch_page(client, p, per_page))
+                    tasks.append(fetch_with_semaphore(p))
 
                 results = await asyncio.gather(*tasks)
 
