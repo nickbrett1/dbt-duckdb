@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # filepath: /workspaces/dbt-duckdb/populate.py
 import os
+import io
 import shutil
 import tempfile
 import subprocess
@@ -51,8 +52,20 @@ def process_parquet_postgres(parquet_path, table_name, engine):
                 text(f"DROP TABLE IF EXISTS public.{table_name} CASCADE"))
         df = pd.read_parquet(parquet_path, engine="pyarrow")
         # Write the new table to the database with if_exists="replace"
-        df.to_sql(table_name, engine, schema="public",
-                  if_exists="replace", index=False)
+        df.head(0).to_sql(table_name, engine, schema="public",
+                          if_exists="replace", index=False)
+
+        # Write data using COPY
+        raw_conn = engine.raw_connection()
+        try:
+            with raw_conn.cursor() as cur:
+                output = io.StringIO()
+                df.to_csv(output, sep=',', index=False, header=False, na_rep='__NULL__')
+                output.seek(0)
+                cur.copy_expert(f"COPY public.{table_name} FROM STDIN WITH (FORMAT CSV, NULL '__NULL__')", output)
+            raw_conn.commit()
+        finally:
+            raw_conn.close()
         print(
             f"Table {table_name} loaded with {len(df)} rows from {parquet_path}.")
     except Exception as e:
