@@ -4,7 +4,7 @@ anyio==4.9.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==21.2.0
 arrow==1.4.0
-asttokens==3.0.0
+asttokens==3.0.1
 async-lru==2.1.0
 attrs==25.4.0
 babel==2.18.0
