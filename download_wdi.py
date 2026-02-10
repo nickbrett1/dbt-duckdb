@@ -7,6 +7,7 @@ import zipfile
 import argparse
 import pandas as pd
 import shutil
+import concurrent.futures
 
 # Constants for downloading WDI data
 SOURCE = "https://databank.worldbank.org/data/download/WDI_CSV.zip"
@@ -76,12 +77,23 @@ def convert_csv_to_parquet(csv_path, parquet_path):
 
 def process_wdi_data(raw_zip, work_dir):
     unzip_file(raw_zip, work_dir)
-    for file in os.listdir(work_dir):
-        if file.endswith(".csv"):
+
+    # Collect all CSV files to be processed
+    csv_files = [f for f in os.listdir(work_dir) if f.endswith(".csv")]
+
+    # Use ProcessPoolExecutor to parallelize the conversion
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = []
+        for file in csv_files:
             csv_path = os.path.join(work_dir, file)
             parquet_filename = os.path.splitext(file)[0] + ".parquet"
             parquet_path = os.path.join(work_dir, parquet_filename)
-            convert_csv_to_parquet(csv_path, parquet_path)
+            futures.append(executor.submit(
+                convert_csv_to_parquet, csv_path, parquet_path))
+
+        # Wait for all tasks to complete
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 
 def main():
