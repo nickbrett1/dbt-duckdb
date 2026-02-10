@@ -64,7 +64,7 @@ jupyterlab_pygments==0.3.0
 jupyterlab_server==2.28.0
 leather==0.4.1
 MarkupSafe==3.0.3
-mashumaro==3.14
+mashumaro==3.20
 matplotlib-inline==0.1.7
 mistune==3.2.0
 more-itertools==10.8.0
