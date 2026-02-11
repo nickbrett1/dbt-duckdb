@@ -3,7 +3,6 @@
 import os
 import subprocess
 import tempfile
-import sqlite3
 import duckdb
 import re
 import json
@@ -20,13 +19,15 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
         print(f"Overwriting existing {sqlite_filename} file.")
         os.remove(sqlite_filename)
     duck_conn = duckdb.connect(duckdb_filename, read_only=True)
-    sqlite_conn = sqlite3.connect(sqlite_filename)
+    # Attach SQLite database. The 'READ_ONLY false' option allows writing to the attached DB
+    # even if the main DuckDB connection is read-only.
+    duck_conn.execute(f"ATTACH '{sqlite_filename}' AS sqlite_db (TYPE SQLITE, READ_ONLY false)")
+
     all_tables = duck_conn.execute("SHOW TABLES;").fetchall()
     tables = [t for t in all_tables if t[0] in tables_to_export]
     if not tables:
         print("No matching tables found in DuckDB. Skipping export.")
         duck_conn.close()
-        sqlite_conn.close()
         return
     print(
         f"Exporting only the following tables: {', '.join([t[0] for t in tables])}")
@@ -43,29 +44,28 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
             col_type = "TEXT" if "text" in col[1].lower() else "REAL" if (
                 "double" in col[1].lower() or "int" in col[1].lower()) else "TEXT"
             columns_def.append(f'"{col_name}" {col_type}')
-        create_stmt = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(columns_def)});'
-        sqlite_conn.execute(create_stmt)
-        query = f"SELECT * FROM {table_name}" if not sample else f"SELECT * FROM {table_name} WHERE random() < 0.01"
-        cursor = duck_conn.execute(query)
-        chunk_size = 50000
-        total_rows = 0
-        placeholders = ", ".join(["?"] * len(columns_info))
-        insert_stmt = f'INSERT INTO "{table_name}" VALUES ({placeholders});'
 
-        while True:
-            rows = cursor.fetchmany(chunk_size)
-            if not rows:
-                break
-            sqlite_conn.executemany(insert_stmt, rows)
-            total_rows += len(rows)
+        # Create table in the attached SQLite database
+        create_stmt = f'CREATE TABLE IF NOT EXISTS sqlite_db."{table_name}" ({", ".join(columns_def)});'
+        duck_conn.execute(create_stmt)
+
+        # Perform direct insert from DuckDB to SQLite
+        insert_query = f"INSERT INTO sqlite_db.\"{table_name}\" SELECT * FROM {table_name}"
+        if sample:
+            insert_query += " WHERE random() < 0.01"
+
+        duck_conn.execute(insert_query)
+
+        # Get the row count from the destination table
+        total_rows = duck_conn.execute(f'SELECT count(*) FROM sqlite_db."{table_name}"').fetchone()[0]
 
         if total_rows == 0:
             print(f'Warning: Table "{table_name}" has no rows.')
         else:
             print(f'Inserted {total_rows} rows into "{table_name}".')
-        sqlite_conn.commit()
+
+    duck_conn.execute("DETACH sqlite_db")
     duck_conn.close()
-    sqlite_conn.close()
     print("Export to SQLite complete.")
 
 
