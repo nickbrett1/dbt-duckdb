@@ -71,32 +71,34 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
 
 def dump_table_from_sqlite(db_filename: str, table: str, output_file: str) -> None:
     dump_cmd = f'sqlite3 {db_filename} ".dump {table}"'
-    result = subprocess.run(dump_cmd, shell=True,
-                            capture_output=True, text=True, check=True)
-    dump_text = result.stdout
-    cleaned_lines = []
-    skip_kv_block = False
-    total_lines = 0
-    skipped_lines = 0
-    kv_pattern = re.compile(r'^CREATE TABLE _cf_KV ')
-    for line in dump_text.splitlines():
-        total_lines += 1
-        if line.startswith("BEGIN TRANSACTION;") or line.startswith("COMMIT;"):
-            skipped_lines += 1
-            continue
-        if kv_pattern.match(line):
-            skip_kv_block = True
-            skipped_lines += 1
-            continue
-        if skip_kv_block:
-            skipped_lines += 1
-            if "WITHOUT ROWID;" in line:
-                skip_kv_block = False
-            continue
-        cleaned_lines.append(line)
-    cleaned_dump = "\n".join(cleaned_lines)
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(cleaned_dump)
+    # Use Popen to stream the output line by line to avoid loading the entire dump into memory
+    with subprocess.Popen(dump_cmd, shell=True, stdout=subprocess.PIPE, text=True) as process:
+        skip_kv_block = False
+        total_lines = 0
+        skipped_lines = 0
+        kv_pattern = re.compile(r'^CREATE TABLE _cf_KV ')
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            for line in process.stdout:
+                total_lines += 1
+                if line.startswith("BEGIN TRANSACTION;") or line.startswith("COMMIT;"):
+                    skipped_lines += 1
+                    continue
+                if kv_pattern.match(line):
+                    skip_kv_block = True
+                    skipped_lines += 1
+                    continue
+                if skip_kv_block:
+                    skipped_lines += 1
+                    if "WITHOUT ROWID;" in line:
+                        skip_kv_block = False
+                    continue
+                f.write(line)
+
+        process.wait()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, dump_cmd)
+
     print(
         f"Dumped and cleaned table {table} to {output_file}. Processed {total_lines} lines, skipped {skipped_lines} lines.")
 
