@@ -86,7 +86,7 @@ parsedatetime==2.6
 parso==0.8.6
 pathspec==0.12.1
 pexpect==4.9.0
-platformdirs==4.5.1
+platformdirs==4.9.2
 prometheus_client==0.24.1
 prompt_toolkit==3.0.52
 protobuf==6.33.5
