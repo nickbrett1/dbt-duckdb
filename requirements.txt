@@ -69,7 +69,7 @@ matplotlib-inline==0.1.7
 mistune==3.2.0
 more-itertools==10.8.0
 msgpack==1.1.2
-nbclient==0.10.2
+nbclient==0.10.4
 nbconvert==7.16.6
 nbdime==4.0.3
 nbformat==5.10.4
