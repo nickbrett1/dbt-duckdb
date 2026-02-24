@@ -5,6 +5,7 @@ import sys
 import subprocess
 import tempfile
 import json
+import concurrent.futures
 import pandas as pd
 import argparse
 
@@ -13,6 +14,28 @@ def load_and_sort_parquet_file(filename: str) -> pd.DataFrame:
     df = pd.read_parquet(filename, engine="pyarrow")
     sort_cols = df.columns.tolist()
     return df.sort_values(by=sort_cols).reset_index(drop=True)
+
+
+def compare_file_pair(filename: str, common_dir: str, temp_download_dir: str) -> str:
+    local_file = os.path.join(common_dir, filename)
+    remote_file = os.path.join(temp_download_dir, filename)
+
+    try:
+        local_df = load_and_sort_parquet_file(local_file)
+        remote_df = load_and_sort_parquet_file(remote_file)
+        pd.testing.assert_frame_equal(
+            local_df, remote_df,
+            rtol=1e-5, atol=5e-4, check_exact=False
+        )
+        return None
+    except AssertionError:
+        print(f"Data mismatch in file: {filename}")
+        return local_file
+    except Exception as e:
+        print(f"Failed to compare file {filename}: {e}")
+        # If comparison fails (e.g. load error), assume changed to be safe?
+        # Or if remote file is corrupt/missing (shouldn't be missing if downloaded).
+        return local_file
 
 
 def get_changed_files(local_files: list, remote_base_path: str, temp_download_dir: str) -> list:
@@ -103,25 +126,15 @@ def get_changed_files(local_files: list, remote_base_path: str, temp_download_di
                     os.remove(dl_list_path)
 
             # Compare downloaded files with local files
-            for filename in files_to_download:
-                local_file = os.path.join(common_dir, filename)
-                remote_file = os.path.join(temp_download_dir, filename)
-
-                try:
-                    local_df = load_and_sort_parquet_file(local_file)
-                    remote_df = load_and_sort_parquet_file(remote_file)
-                    pd.testing.assert_frame_equal(
-                        local_df, remote_df,
-                        rtol=1e-5, atol=5e-4, check_exact=False
-                    )
-                except AssertionError:
-                    print(f"Data mismatch in file: {filename}")
-                    changed.append(local_file)
-                except Exception as e:
-                    print(f"Failed to compare file {filename}: {e}")
-                    # If comparison fails (e.g. load error), assume changed to be safe?
-                    # Or if remote file is corrupt/missing (shouldn't be missing if downloaded).
-                    changed.append(local_file)
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                futures = {
+                    executor.submit(compare_file_pair, filename, common_dir, temp_download_dir): filename
+                    for filename in files_to_download
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    result = future.result()
+                    if result:
+                        changed.append(result)
 
     finally:
         if temp_list_path and os.path.exists(temp_list_path):
