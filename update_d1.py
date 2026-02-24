@@ -117,53 +117,55 @@ def split_file(file_path: str, max_lines: int = 50000) -> list:
     returns a list with the original file.
     """
     base, ext = os.path.splitext(file_path)
-    chunk_files = []
 
     with open(file_path, "r", encoding="utf-8") as f:
         # Read the first batch of lines
-        chunk_lines = list(islice(f, max_lines))
+        first_chunk = list(islice(f, max_lines))
 
-        # If we reached EOF and haven't filled the chunk, or just filled it exactly with no more lines
-        if len(chunk_lines) < max_lines:
+        # If we reached EOF and haven't filled the chunk
+        if len(first_chunk) < max_lines:
             return [file_path]
 
         # Check if there is at least one more line
         try:
-            next_line = next(f)
+            peek = next(f)
         except StopIteration:
             # File has exactly max_lines. No need to split.
             return [file_path]
 
         # If we are here, we have max_lines + 1 lines (at least). We must split.
+        chunk_files = []
         chunk_index = 0
 
         # Write the first chunk (from the initial buffer)
         chunk_file = f"{base}_chunk_{chunk_index}{ext}"
         with open(chunk_file, "w", encoding="utf-8") as cf:
-            cf.writelines(chunk_lines)
+            cf.writelines(first_chunk)
         chunk_files.append(chunk_file)
         chunk_index += 1
 
-        # Start the next chunk with the one extra line we read
-        chunk_lines = [next_line]
+        # Second chunk processing
+        chunk_file = f"{base}_chunk_{chunk_index}{ext}"
+        with open(chunk_file, "w", encoding="utf-8") as cf:
+            cf.write(peek)
+            # Write up to max_lines - 1 more lines
+            cf.writelines(islice(f, max_lines - 1))
+        chunk_files.append(chunk_file)
+        chunk_index += 1
 
-        # Continue reading the rest of the file
-        for line in f:
-            chunk_lines.append(line)
-            if len(chunk_lines) == max_lines:
-                chunk_file = f"{base}_chunk_{chunk_index}{ext}"
-                with open(chunk_file, "w", encoding="utf-8") as cf:
-                    cf.writelines(chunk_lines)
-                chunk_files.append(chunk_file)
-                chunk_lines = []
-                chunk_index += 1
+        # Continue processing remaining chunks
+        while True:
+            try:
+                line = next(f)
+            except StopIteration:
+                break
 
-        # Write any remaining lines
-        if chunk_lines:
             chunk_file = f"{base}_chunk_{chunk_index}{ext}"
             with open(chunk_file, "w", encoding="utf-8") as cf:
-                cf.writelines(chunk_lines)
+                cf.write(line)
+                cf.writelines(islice(f, max_lines - 1))
             chunk_files.append(chunk_file)
+            chunk_index += 1
 
     print(
         f"Split {file_path} into {len(chunk_files)} chunks (threshold = {max_lines} lines).")
