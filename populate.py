@@ -8,6 +8,7 @@ import subprocess
 import duckdb
 import argparse
 import pandas as pd
+import concurrent.futures
 from sqlalchemy import create_engine, text
 
 # Constants for processing
@@ -127,12 +128,22 @@ def main():
                 print("DuckDB population complete.")
             elif args.use_postgres:
                 engine = setup_postgres_engine()
-                for file in parquet_files:
-                    parquet_path = os.path.join(temp_dir, file)
-                    table_name = os.path.splitext(file)[0].replace("-", "")
-                    print(
-                        f"Starting PostgreSQL processing for table: {table_name}")
-                    process_parquet_postgres(parquet_path, table_name, engine)
+                # Use ThreadPoolExecutor to parallelize PostgreSQL processing
+                # We use 5 workers as a reasonable default for I/O bound tasks
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = []
+                    for file in parquet_files:
+                        parquet_path = os.path.join(temp_dir, file)
+                        table_name = os.path.splitext(file)[0].replace("-", "")
+                        print(
+                            f"Starting PostgreSQL processing for table: {table_name}")
+                        futures.append(executor.submit(
+                            process_parquet_postgres, parquet_path, table_name, engine))
+
+                    # Wait for all tasks to complete and handle exceptions
+                    for future in concurrent.futures.as_completed(futures):
+                        future.result()
+
                 print("PostgreSQL population complete.")
     finally:
         print("Cleaning up temporary files...")
