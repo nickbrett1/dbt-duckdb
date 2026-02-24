@@ -51,10 +51,10 @@ async def fetch_population_data_async():
             # Get records from first page
             records = data[1] if len(data) > 1 else []
             print(f"Retrieved {len(records)} records from page {page} of {total_pages}.")
-            pop_list.extend([
+            pop_list.extend(
                 {"country_code": row.get("countryiso3code"), "population": row.get("value")}
                 for row in records if row.get("countryiso3code") is not None
-            ])
+            )
 
             # Fetch remaining pages concurrently
             if total_pages > 1:
@@ -73,10 +73,10 @@ async def fetch_population_data_async():
                 for i, records in enumerate(results):
                     current_page = i + 2
                     print(f"Retrieved {len(records)} records from page {current_page} of {total_pages}.")
-                    pop_list.extend([
+                    pop_list.extend(
                         {"country_code": row.get("countryiso3code"), "population": row.get("value")}
                         for row in records if row.get("countryiso3code") is not None
-                    ])
+                    )
 
         print(f"Total population data records: {len(pop_list)}")
         return pop_list
