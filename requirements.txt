@@ -1,4 +1,4 @@
-agate==1.9.1
+agate==1.14.1
 annotated-types==0.7.0
 anyio==4.12.1
 argon2-cffi==25.1.0
