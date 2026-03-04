@@ -103,11 +103,18 @@ def dump_table_from_sqlite(db_filename: str, table: str, output_file: str) -> No
         f"Dumped and cleaned table {table} to {output_file}. Processed {total_lines} lines, skipped {skipped_lines} lines.")
 
 
-def drop_mart_table_from_d1(table: str, d1_mode: str) -> None:
+def drop_mart_tables_from_d1(tables: list, d1_mode: str, work_dir: str) -> None:
+    if not tables:
+        return
     flag = "--local" if d1_mode == "local" else "--remote"
-    drop_cmd = f"npx wrangler@latest d1 execute wdi {flag} --command \"DROP TABLE IF EXISTS {table};\" --yes"
+    drop_sql_file = os.path.join(work_dir, "drop_tables.sql")
+    with open(drop_sql_file, "w", encoding="utf-8") as f:
+        for table in tables:
+            f.write(f"DROP TABLE IF EXISTS {table};\n")
+
+    drop_cmd = f"npx wrangler@latest d1 execute wdi {flag} --file {drop_sql_file} --yes"
     subprocess.run(drop_cmd, shell=True, check=True)
-    print(f"Dropped table {table} from D1 database 'wdi'.")
+    print(f"Dropped {len(tables)} tables from D1 database 'wdi'.")
 
 
 def split_file(file_path: str, max_lines: int = 50000) -> list:
@@ -229,11 +236,13 @@ def main():
             f"Exporting selected tables to SQLite database in {sqlite_dir} ...")
         export_duckdb_to_sqlite(
             duckdb_filename, sqlite_filename, sample=args.sample, tables_to_export=changed_tables)
+        print(f"Dropping tables: {', '.join(changed_tables)}")
+        drop_mart_tables_from_d1(changed_tables, d1_mode, sqlite_dir)
+
         for table in changed_tables:
             print(f"Processing table {table} for D1 update...")
             table_dump_file = os.path.join(sqlite_dir, f"{table}.sql")
             dump_table_from_sqlite(sqlite_filename, table, table_dump_file)
-            drop_mart_table_from_d1(table, d1_mode)
             # Use our new function that handles splitting if the dump file is huge.
             update_d1_table_from_dump_chunks(
                 table_dump_file, d1_mode, max_lines=250000)
