@@ -12,18 +12,30 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str) -> list:
     mart_prefixes = ("fct_", "dim_", "agg_")
     exported_files = []
     print("Exporting marts tables from DuckDB to local Parquet files:")
+
+    # Fetch all column metadata in a single query
+    all_columns_query = "SELECT table_name, column_name FROM information_schema.columns ORDER BY table_name, ordinal_position"
+    all_columns_info = duck_conn.execute(all_columns_query).fetchall()
+
+    table_columns = {}
+    for table_name, column_name in all_columns_info:
+        if table_name not in table_columns:
+            table_columns[table_name] = []
+        table_columns[table_name].append(column_name)
+
     for row in tables:
         table_name = row[0]
         if table_name.startswith(mart_prefixes):
             parquet_filename = os.path.join(
                 output_dir, f"{table_name}.parquet")
-            cols_info = duck_conn.execute(f"DESCRIBE {table_name}").fetchall()
+
+            cols_info = table_columns.get(table_name, [])
             if not cols_info:
                 print(f"Warning: Could not retrieve columns for {table_name}")
                 continue
-            order_by = ", ".join([col[0] for col in cols_info])
-            select_exprs = [col[0] for col in cols_info]
-            select_list = ", ".join(select_exprs)
+
+            order_by = ", ".join(cols_info)
+            select_list = ", ".join(cols_info)
             copy_query = (
                 f"COPY (SELECT {select_list} FROM {table_name} ORDER BY {order_by}) "
                 f"TO '{parquet_filename}' (FORMAT 'parquet')"
