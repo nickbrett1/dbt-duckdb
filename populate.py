@@ -28,7 +28,6 @@ def process_parquet_duckdb(parquet_path, table_name, con):
     print(
         f"Processing table {table_name} in DuckDB from file {parquet_path}...")
 
-    con.execute("CREATE SCHEMA IF NOT EXISTS public")
     query = f"""
     CREATE TABLE IF NOT EXISTS public.{table_name} AS
     SELECT * FROM read_parquet('{parquet_path}');
@@ -116,6 +115,7 @@ def main():
         else:
             if args.use_duckdb:
                 con = duckdb.connect(DUCKDB_DATABASE)
+                con.execute("CREATE SCHEMA IF NOT EXISTS public")
                 try:
                     for file in parquet_files:
                         parquet_path = os.path.join(temp_dir, file)
