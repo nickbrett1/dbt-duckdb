@@ -10,3 +10,5 @@ node_modules/
 .wrangler
 __pycache__/
 dev_data
+test_benchmark.duckdb
+test_output/
