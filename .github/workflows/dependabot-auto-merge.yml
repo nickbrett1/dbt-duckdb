@@ -25,16 +25,20 @@ jobs:
           fi
 
           if [ -z "$PR_URL" ] && [ -n "$BRANCH" ]; then
-            PR_URL=$(gh pr list --head "$BRANCH" --author "dependabot[bot]" --json url --jq '.[0].url')
+            PR_URL=$(gh pr list --head "$BRANCH" --author "app/dependabot" --json url --jq '.[0].url // empty')
           fi
 
-          if [ -z "$PR_URL" ]; then
+          if [ -z "$PR_URL" ] && [ -n "$BRANCH" ]; then
+            PR_URL=$(gh pr list --head "$BRANCH" --author "dependabot[bot]" --json url --jq '.[0].url // empty')
+          fi
+
+          if [ -z "$PR_URL" ] || [ "$PR_URL" = "null" ]; then
             echo "No Dependabot PR found. Skipping."
             exit 0
           fi
 
           # Double check author just in case
-          IS_DEPENDABOT=$(gh pr view "$PR_URL" --json author --jq '.author.login == "dependabot[bot]"')
+          IS_DEPENDABOT=$(gh pr view "$PR_URL" --json author --jq '.author.login == "dependabot[bot]" or .author.login == "app/dependabot"')
           if [ "$IS_DEPENDABOT" != "true" ]; then
             echo "PR is not from Dependabot. Skipping."
             exit 0
