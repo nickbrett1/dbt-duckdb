@@ -47,17 +47,17 @@ jobs:
           echo "Processing PR: $PR_URL"
 
           # Get checks status
-          CHECKS=$(gh pr checks "$PR_URL" --json name,status,conclusion)
+          CHECKS=$(gh pr checks "$PR_URL" --json name,bucket)
 
           # Check for failures (excluding this workflow's job, which is named 'dependabot-merge' and check suite 'Dependabot auto-merge')
-          FAILED=$(echo "$CHECKS" | jq '[.[] | select(.name != "dependabot-merge" and .name != "Dependabot auto-merge" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required"))] | length')
+          FAILED=$(echo "$CHECKS" | jq '[.[] | select(.name != "dependabot-merge" and .name != "Dependabot auto-merge" and (.bucket == "fail" or .bucket == "cancel"))] | length')
           if [ "$FAILED" -gt 0 ]; then
             echo "Some checks failed. Skipping merge."
             exit 0
           fi
 
           # Check for pending/running (excluding this workflow's job)
-          PENDING=$(echo "$CHECKS" | jq '[.[] | select(.name != "dependabot-merge" and .name != "Dependabot auto-merge" and (.status == "queued" or .status == "in_progress" or .conclusion == null))] | length')
+          PENDING=$(echo "$CHECKS" | jq '[.[] | select(.name != "dependabot-merge" and .name != "Dependabot auto-merge" and .bucket == "pending")] | length')
           if [ "$PENDING" -gt 0 ]; then
              echo "Some checks are still pending. Skipping merge."
              exit 0
