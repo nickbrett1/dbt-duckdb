@@ -31,10 +31,21 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
         return
     print(
         f"Exporting only the following tables: {', '.join([t[0] for t in tables])}")
+
+    # Fetch all column metadata in a single query to avoid N+1 performance issue
+    all_columns_query = "SELECT table_name, column_name, data_type FROM information_schema.columns ORDER BY table_name, ordinal_position"
+    all_columns_info = duck_conn.execute(all_columns_query).fetchall()
+
+    table_columns = {}
+    for t_name, c_name, d_type in all_columns_info:
+        if t_name not in table_columns:
+            table_columns[t_name] = []
+        table_columns[t_name].append((c_name, d_type))
+
     for row in tables:
         table_name = row[0]
         print(f" * Exporting table: {table_name}")
-        columns_info = duck_conn.execute(f"DESCRIBE {table_name}").fetchall()
+        columns_info = table_columns.get(table_name, [])
         if not columns_info:
             print(f"Warning: No column info for table {table_name}")
             continue
