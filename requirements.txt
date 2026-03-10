@@ -128,7 +128,7 @@ tinycss2==1.4.0
 tornado==6.5.4
 tqdm==4.67.3
 traitlets==5.14.3
-types-python-dateutil==2.9.0.20260302
+types-python-dateutil==2.9.0.20260305
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.3
