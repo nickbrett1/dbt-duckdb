@@ -32,9 +32,12 @@ def process_parquet_duckdb(parquet_path, table_name, con):
     CREATE TABLE IF NOT EXISTS public.{table_name} AS
     SELECT * FROM read_parquet('{parquet_path}');
     """
-    con.execute(query)
-    count = con.execute(
-        f"SELECT COUNT(*) FROM public.{table_name}").fetchone()[0]
+    res = con.execute(query).fetchone()
+    if res is not None:
+        count = res[0]
+    else:
+        count = con.execute(
+            f"SELECT COUNT(*) FROM public.{table_name}").fetchone()[0]
     if count == 0:
         print(f"Error: No data loaded into public.{table_name}.")
     else:
