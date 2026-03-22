@@ -65,10 +65,8 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
         if sample:
             insert_query += " WHERE random() < 0.01"
 
-        duck_conn.execute(insert_query)
-
-        # Get the row count from the destination table
-        total_rows = duck_conn.execute(f'SELECT count(*) FROM sqlite_db."{table_name}"').fetchone()[0]
+        # Execute insert and get the row count natively returned by DuckDB
+        total_rows = duck_conn.execute(insert_query).fetchone()[0]
 
         if total_rows == 0:
             print(f'Warning: Table "{table_name}" has no rows.')
