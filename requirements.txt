@@ -13,7 +13,7 @@ bleach==6.3.0
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.7
-click==8.3.2
+click==8.3.3
 colorama==0.4.6
 comm==0.2.3
 daff==1.4.2
