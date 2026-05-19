@@ -19,12 +19,16 @@ R2_BUCKET_WDI = "r2:wdi"
 
 def download_file(url, dest_dir):
     print(f"Downloading WDI data from {url} using rclone...")
-    result = subprocess.run(
-        ["rclone", "copyurl", url, dest_dir, "--auto-filename", "--print-filename"],
-        capture_output=True,
-        text=True,
-        check=True
-    )
+    try:
+        result = subprocess.run(
+            ["rclone", "copyurl", url, dest_dir, "--auto-filename", "--print-filename", "--no-check-certificate"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"rclone error:\n{e.stderr}")
+        raise
     filename = result.stdout.strip()
     print(f"Downloaded file: {filename}")
     return os.path.join(dest_dir, filename)
