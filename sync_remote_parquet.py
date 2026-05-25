@@ -143,40 +143,54 @@ def get_changed_files(local_files: list, remote_base_path: str, temp_download_di
     return changed
 
 
+def _sync_dir(dirname: str, filenames: list, remote_path: str) -> None:
+    print(f"Syncing {len(filenames)} files from {dirname} to {remote_path}...")
+    temp_list_path = None
+    try:
+        # Create a temporary file list for --files-from
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tf:
+            for filename in filenames:
+                # Escape backslashes first, as they are the escape character
+                filename_esc = filename.replace("\\", "\\\\")
+                # Escape filenames starting with # or ; as rclone treats them as comments
+                if filename_esc.startswith("#") or filename_esc.startswith(";"):
+                    filename_esc = "\\" + filename_esc
+                tf.write(filename_esc + "\n")
+            temp_list_path = tf.name
+
+        try:
+            subprocess.run(
+                ["rclone", "copy", dirname, remote_path, "--files-from", temp_list_path],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"rclone copy failed for {dirname}: {e.stderr}", file=sys.stderr)
+            raise
+    finally:
+        if temp_list_path and os.path.exists(temp_list_path):
+            os.remove(temp_list_path)
+
 def sync_local_to_remote(files: list, remote_path: str = "r2:wdi") -> None:
     # Group files by directory to batch rclone calls
     files_by_dir = {}
     for local_file in files:
-        dirname = os.path.dirname(local_file)
+        dirname, filename = os.path.split(local_file)
         # If path is just a filename, dirname is empty string, convert to current dir
         if not dirname:
             dirname = "."
         if dirname not in files_by_dir:
             files_by_dir[dirname] = []
-        files_by_dir[dirname].append(os.path.basename(local_file))
+        files_by_dir[dirname].append(filename)
 
-    for dirname, filenames in files_by_dir.items():
-        print(f"Syncing {len(filenames)} files from {dirname} to {remote_path}...")
-        temp_list_path = None
-        try:
-            # Create a temporary file list for --files-from
-            with tempfile.NamedTemporaryFile(mode="w", delete=False) as tf:
-                for filename in filenames:
-                    # Escape backslashes first, as they are the escape character
-                    filename_esc = filename.replace("\\", "\\\\")
-                    # Escape filenames starting with # or ; as rclone treats them as comments
-                    if filename_esc.startswith("#") or filename_esc.startswith(";"):
-                        filename_esc = "\\" + filename_esc
-                    tf.write(filename_esc + "\n")
-                temp_list_path = tf.name
-
-            subprocess.run(
-                ["rclone", "copy", dirname, remote_path, "--files-from", temp_list_path],
-                check=True
-            )
-        finally:
-            if temp_list_path and os.path.exists(temp_list_path):
-                os.remove(temp_list_path)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(_sync_dir, dirname, filenames, remote_path)
+            for dirname, filenames in files_by_dir.items()
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 
 def main():
