@@ -49,24 +49,21 @@ def export_duckdb_to_sqlite(duckdb_filename: str, sqlite_filename: str, sample: 
         if not columns_info:
             print(f"Warning: No column info for table {table_name}")
             continue
-        columns_def = []
+        select_cols = []
         for col in columns_info:
             col_name = col[0]
-            col_type = "TEXT" if "text" in col[1].lower() else "REAL" if (
-                "double" in col[1].lower() or "int" in col[1].lower()) else "TEXT"
-            columns_def.append(f'"{col_name}" {col_type}')
+            col_type = "VARCHAR" if "text" in col[1].lower() else "DOUBLE" if (
+                "double" in col[1].lower() or "int" in col[1].lower()) else "VARCHAR"
+            select_cols.append(f'CAST("{col_name}" AS {col_type}) AS "{col_name}"')
 
-        # Create table in the attached SQLite database
-        create_stmt = f'CREATE TABLE IF NOT EXISTS sqlite_db."{table_name}" ({", ".join(columns_def)});'
-        duck_conn.execute(create_stmt)
+        # Perform single CREATE TABLE AS SELECT to avoid N+1 query overhead
+        select_clause = ", ".join(select_cols)
+        where_clause = " WHERE random() < 0.01" if sample else ""
 
-        # Perform direct insert from DuckDB to SQLite
-        insert_query = f"INSERT INTO sqlite_db.\"{table_name}\" SELECT * FROM {table_name}"
-        if sample:
-            insert_query += " WHERE random() < 0.01"
+        ctas_query = f'CREATE TABLE sqlite_db."{table_name}" AS SELECT {select_clause} FROM {table_name}{where_clause}'
 
-        # Execute insert and get the row count natively returned by DuckDB
-        total_rows = duck_conn.execute(insert_query).fetchone()[0]
+        # Execute CTAS and get the row count natively returned by DuckDB
+        total_rows = duck_conn.execute(ctas_query).fetchone()[0]
 
         if total_rows == 0:
             print(f'Warning: Table "{table_name}" has no rows.')
