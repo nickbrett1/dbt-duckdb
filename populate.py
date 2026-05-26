@@ -8,6 +8,7 @@ import subprocess
 import duckdb
 import argparse
 import pandas as pd
+import pyarrow.parquet as pq
 import concurrent.futures
 from sqlalchemy import create_engine, text
 
@@ -53,24 +54,30 @@ def process_parquet_postgres(parquet_path, table_name, engine):
         with engine.begin() as conn:
             conn.execute(
                 text(f"DROP TABLE IF EXISTS public.{table_name} CASCADE"))
-        df = pd.read_parquet(parquet_path, engine="pyarrow")
-        # Write the new table to the database with if_exists="replace"
-        df.head(0).to_sql(table_name, engine, schema="public",
+
+        pf = pq.ParquetFile(parquet_path)
+        # Write the new table to the database with if_exists="replace" using an empty dataframe for schema
+        df_schema = pf.schema_arrow.empty_table().to_pandas()
+        df_schema.to_sql(table_name, engine, schema="public",
                           if_exists="replace", index=False)
 
+        total_rows = 0
         # Write data using COPY
         raw_conn = engine.raw_connection()
         try:
             with raw_conn.cursor() as cur:
-                output = io.StringIO()
-                df.to_csv(output, sep=',', index=False, header=False, na_rep='__NULL__')
-                output.seek(0)
-                cur.copy_expert(f"COPY public.{table_name} FROM STDIN WITH (FORMAT CSV, NULL '__NULL__')", output)
+                for batch in pf.iter_batches(batch_size=100000):
+                    df_batch = batch.to_pandas()
+                    total_rows += len(df_batch)
+                    output = io.StringIO()
+                    df_batch.to_csv(output, sep=',', index=False, header=False, na_rep='__NULL__')
+                    output.seek(0)
+                    cur.copy_expert(f"COPY public.{table_name} FROM STDIN WITH (FORMAT CSV, NULL '__NULL__')", output)
             raw_conn.commit()
         finally:
             raw_conn.close()
         print(
-            f"Table {table_name} loaded with {len(df)} rows from {parquet_path}.")
+            f"Table {table_name} loaded with {total_rows} rows from {parquet_path}.")
     except Exception as e:
         print(f"Error processing {parquet_path} for table {table_name}: {e}")
 
