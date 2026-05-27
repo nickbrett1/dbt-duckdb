@@ -142,8 +142,10 @@ jobs:
 workflows:
   download_transform_load:
     jobs:
-      - download_population
-      - download_wdi
+      - download_population:
+          context: common
+      - download_wdi:
+          context: common
       - transform_and_load:
           requires:
             - download_population
