@@ -3,7 +3,7 @@ version: 2
 sources:
   - name: wdi
     database: "{{ 'wdi' if target.name == 'dev' else target.database }}"
-    schema: "{{ 'public' if target.name == 'dev' else target.schema }}"
+    schema: "public"
     description: "Raw data from WDI"
 
     tables:
