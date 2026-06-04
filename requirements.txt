@@ -176,7 +176,7 @@ markupsafe==3.0.3
     # via
     #   jinja2
     #   nbconvert
-mashumaro[msgpack]==3.14
+mashumaro[msgpack]==3.17
     # via
     #   dbt-adapters
     #   dbt-common
