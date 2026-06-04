@@ -14,7 +14,7 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str) -> list:
     print("Exporting marts tables from DuckDB to local Parquet files:")
 
     # Fetch all column metadata in a single query
-    all_columns_query = "SELECT table_name, column_name FROM information_schema.columns ORDER BY table_name, ordinal_position"
+    all_columns_query = "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'main' ORDER BY table_name, ordinal_position"
     all_columns_info = duck_conn.execute(all_columns_query).fetchall()
 
     table_columns = {}
@@ -37,7 +37,7 @@ def export_mart_tables_parquet(duckdb_filename: str, output_dir: str) -> list:
             order_by = ", ".join(cols_info)
             select_list = ", ".join(cols_info)
             copy_query = (
-                f"COPY (SELECT {select_list} FROM {table_name} ORDER BY {order_by}) "
+                f"COPY (SELECT {select_list} FROM main.{table_name} ORDER BY {order_by}) "
                 f"TO '{parquet_filename}' (FORMAT 'parquet')"
             )
             duck_conn.execute(copy_query)
