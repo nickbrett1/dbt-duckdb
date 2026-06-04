@@ -12,3 +12,6 @@ __pycache__/
 dev_data
 test_benchmark.duckdb
 test_output/
+test_env/
+test_env2/
+final_env/

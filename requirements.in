@@ -1,0 +1,9 @@
+duckdb
+httpx
+pandas
+psycopg2-binary
+pyarrow
+SQLAlchemy
+dbt-duckdb
+dbt-postgres
+jupyterlab
