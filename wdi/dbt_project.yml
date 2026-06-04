@@ -24,3 +24,5 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
+flags:
+  require_generic_test_arguments_property: true
