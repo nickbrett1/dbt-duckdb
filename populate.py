@@ -30,7 +30,7 @@ def process_parquet_duckdb(parquet_path, table_name, con):
         f"Processing table {table_name} in DuckDB from file {parquet_path}...")
 
     query = f"""
-    CREATE TABLE IF NOT EXISTS public.{table_name} AS
+    CREATE TABLE IF NOT EXISTS main.{table_name} AS
     SELECT * FROM read_parquet('{parquet_path}');
     """
     res = con.execute(query).fetchone()
@@ -38,12 +38,12 @@ def process_parquet_duckdb(parquet_path, table_name, con):
         count = res[0]
     else:
         count = con.execute(
-            f"SELECT COUNT(*) FROM public.{table_name}").fetchone()[0]
+            f"SELECT COUNT(*) FROM main.{table_name}").fetchone()[0]
     if count == 0:
-        print(f"Error: No data loaded into public.{table_name}.")
+        print(f"Error: No data loaded into main.{table_name}.")
     else:
         print(
-            f"Table public.{table_name} loaded with {count} rows from {parquet_path}.")
+            f"Table main.{table_name} loaded with {count} rows from {parquet_path}.")
 
 
 def process_parquet_postgres(parquet_path, table_name, engine):
@@ -125,7 +125,7 @@ def main():
         else:
             if args.use_duckdb:
                 con = duckdb.connect(DUCKDB_DATABASE)
-                con.execute("CREATE SCHEMA IF NOT EXISTS public")
+                con.execute("CREATE SCHEMA IF NOT EXISTS main")
                 try:
                     for file in parquet_files:
                         parquet_path = os.path.join(temp_dir, file)
