@@ -4,6 +4,7 @@ pandas
 psycopg2-binary
 pyarrow
 SQLAlchemy
-dbt-duckdb
-dbt-postgres
+dbt-duckdb<1.10.0,!=1.8.0
+dbt-postgres<1.10.0
 jupyterlab
+dbt-core<2.0.0
