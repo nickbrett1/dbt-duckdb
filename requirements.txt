@@ -262,7 +262,7 @@ prometheus-client==0.25.0
     # via jupyter-server
 prompt-toolkit==3.0.52
     # via ipython
-protobuf==6.33.5
+protobuf==6.33.6
     # via
     #   dbt-adapters
     #   dbt-common
