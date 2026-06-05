@@ -1,46 +1,44 @@
 {% macro duckdb__get_catalog(information_schema, schemas) -%}
-  {%- set query -%}
-    with tables as (
-      {{ duckdb__get_catalog_tables(information_schema, schemas) }}
-    ),
-    columns as (
-      select *
-    from (
-        select
-            c.database_name as table_database,
-            c.schema_name as table_schema,
-            c.table_name as table_name,
-            c.column_name as column_name,
-            cast(c.column_index as decimal) as column_index,
-            c.data_type as column_type,
-            c.comment as column_comment
-        from duckdb_columns() c
-        where upper(c.database_name) = upper('{{ information_schema.database }}')
-    ) catalog_columns
-      {%- if schemas -%}
-        where (
-            {%- for schema in schemas -%}
-                (
-                    upper(table_schema) = upper('{{ schema }}')
-                ){%- if not loop.last %} or {% endif -%}
-            {%- endfor -%}
-        )
-      {%- endif -%}
+  {%- call statement('catalog', fetch_result=True) -%}
+    with relations AS (
+      select
+        t.table_name
+        , t.database_name
+        , t.schema_name
+        , 'BASE TABLE' as table_type
+        , t.comment as table_comment
+      from duckdb_tables() t
+      WHERE t.database_name = '{{ information_schema.database }}'
+      UNION ALL
+      SELECT v.view_name as table_name
+      , v.database_name
+      , v.schema_name
+      , 'VIEW' as table_type
+      , v.comment as table_comment
+      from duckdb_views() v
+      WHERE v.database_name = '{{ information_schema.database }}'
     )
     select
-        tables.table_database,
-        tables.table_schema,
-        tables.table_name,
-        tables.table_type,
-        tables.table_comment,
-        columns.column_name,
-        columns.column_index,
-        columns.column_type,
-        columns.column_comment,
-        cast(null as varchar) as table_owner
-    from tables
-    join columns using (table_database, table_schema, table_name)
-    order by table_schema, table_name, column_index
-  {%- endset -%}
-  {{ return(run_query(query)) }}
+        '{{ information_schema.database }}' as table_database,
+        r.schema_name as table_schema,
+        r.table_name,
+        r.table_type,
+        r.table_comment,
+        c.column_name,
+        cast(c.column_index as decimal) as column_index,
+        c.data_type as column_type,
+        c.comment as column_comment,
+        NULL as table_owner
+    FROM relations r JOIN duckdb_columns() c ON r.schema_name = c.schema_name AND r.table_name = c.table_name
+    WHERE (
+        {%- for schema in schemas -%}
+          upper(r.schema_name) = upper('{{ schema }}'){%- if not loop.last %} or {% endif -%}
+        {%- endfor -%}
+    )
+    ORDER BY
+        r.schema_name,
+        r.table_name,
+        c.column_index
+  {%- endcall -%}
+  {{ return(load_result('catalog').table) }}
 {%- endmacro %}
