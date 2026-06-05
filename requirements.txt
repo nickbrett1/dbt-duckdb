@@ -114,7 +114,7 @@ httpx==0.28.1
     # via
     #   -r requirements.in
     #   jupyterlab
-idna==3.16
+idna==3.18
     # via
     #   anyio
     #   httpx
