@@ -77,7 +77,7 @@ dbt-duckdb==1.10.1
     # via -r requirements.in
 dbt-extractor==0.6.0
     # via dbt-core
-dbt-postgres==1.10.1
+dbt-postgres==1.10.2
     # via -r requirements.in
 dbt-protos==1.0.514
     # via
