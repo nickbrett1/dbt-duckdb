@@ -68,7 +68,7 @@ dbt-common==1.38.0
     #   dbt-core
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core==1.11.11
+dbt-core==1.11.12
     # via
     #   -r requirements.in
     #   dbt-duckdb
