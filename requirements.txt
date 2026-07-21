@@ -48,16 +48,14 @@ cffi==2.0.0
 charset-normalizer==3.4.7
     # via requests
 click==8.4.1
-    # via
-    #   dbt-core
-    #   dbt-semantic-interfaces
+    # via dbt-core
 colorama==0.4.6
     # via dbt-common
 comm==0.2.3
     # via ipykernel
 daff==1.4.2
     # via dbt-core
-dbt-adapters==1.24.2
+dbt-adapters==1.24.5
     # via
     #   dbt-core
     #   dbt-duckdb
@@ -68,11 +66,13 @@ dbt-common==1.38.0
     #   dbt-core
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core==1.11.12
+dbt-core==1.12.0
     # via
     #   -r requirements.in
     #   dbt-duckdb
     #   dbt-postgres
+dbt-core-experimental-parser==2.0.0a5
+    # via dbt-core
 dbt-duckdb==1.10.1
     # via -r requirements.in
 dbt-extractor==0.6.0
@@ -84,8 +84,6 @@ dbt-protos==1.0.514
     #   dbt-adapters
     #   dbt-common
     #   dbt-core
-dbt-semantic-interfaces==0.9.0
-    # via dbt-core
 debugpy==1.8.20
     # via ipykernel
 decorator==5.3.1
@@ -121,7 +119,7 @@ idna==3.18
     #   jsonschema
     #   requests
 importlib-metadata==8.9.0
-    # via dbt-semantic-interfaces
+    # via metricflow
 ipykernel==7.2.0
     # via jupyterlab
 ipython==9.13.0
@@ -140,10 +138,10 @@ jinja2==3.1.6
     # via
     #   dbt-common
     #   dbt-core
-    #   dbt-semantic-interfaces
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
+    #   metricflow
     #   nbconvert
 json5==0.14.0
     # via jupyterlab-server
@@ -153,9 +151,9 @@ jsonschema[format-nongpl]==4.26.0
     # via
     #   dbt-common
     #   dbt-core
-    #   dbt-semantic-interfaces
     #   jupyter-events
     #   jupyterlab-server
+    #   metricflow
     #   nbformat
 jsonschema-specifications==2025.9.1
     # via jsonschema
@@ -211,10 +209,12 @@ matplotlib-inline==0.2.2
     # via
     #   ipykernel
     #   ipython
+metricflow==0.211.0
+    # via dbt-core
 mistune==3.2.1
     # via nbconvert
 more-itertools==10.8.0
-    # via dbt-semantic-interfaces
+    # via metricflow
 msgpack==1.1.2
     # via mashumaro
 nbclient==0.10.4
@@ -292,7 +292,7 @@ pycparser==3.0
 pydantic==2.13.4
     # via
     #   dbt-core
-    #   dbt-semantic-interfaces
+    #   metricflow
 pydantic-core==2.46.4
     # via pydantic
 pygments==2.20.0
@@ -304,9 +304,11 @@ python-dateutil==2.9.0.post0
     # via
     #   arrow
     #   dbt-common
-    #   dbt-semantic-interfaces
     #   jupyter-client
+    #   metricflow
     #   pandas
+python-dotenv==1.2.2
+    # via dbt-core
 python-json-logger==4.1.0
     # via jupyter-events
 python-slugify==8.0.4
@@ -320,18 +322,21 @@ pytz==2026.2
 pyyaml==6.0.3
     # via
     #   dbt-core
-    #   dbt-semantic-interfaces
     #   jupyter-events
+    #   metricflow
 pyzmq==27.1.0
     # via
     #   ipykernel
     #   jupyter-client
     #   jupyter-server
+rapidfuzz==3.14.5
+    # via metricflow
 referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
     #   jupyter-events
+    #   metricflow
 requests==2.34.2
     # via
     #   dbt-common
@@ -364,10 +369,14 @@ soupsieve==2.8.4
     # via beautifulsoup4
 sqlalchemy==2.0.51
     # via -r requirements.in
+sqlglot==30.13.0
+    # via metricflow
 sqlparse==0.5.5
     # via dbt-core
 stack-data==0.6.3
     # via ipython
+tabulate==0.10.0
+    # via metricflow
 terminado==0.18.1
     # via
     #   jupyter-server
@@ -404,8 +413,8 @@ typing-extensions==4.15.0
     #   dbt-adapters
     #   dbt-common
     #   dbt-core
-    #   dbt-semantic-interfaces
     #   mashumaro
+    #   metricflow
     #   pydantic
     #   pydantic-core
     #   referencing
