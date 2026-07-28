@@ -92,7 +92,7 @@ deepdiff==8.6.2
     # via dbt-common
 defusedxml==0.7.1
     # via nbconvert
-duckdb==1.5.4
+duckdb==1.5.5
     # via
     #   -r requirements.in
     #   dbt-duckdb
