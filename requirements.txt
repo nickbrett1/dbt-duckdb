@@ -66,12 +66,12 @@ dbt-common==1.38.0
     #   dbt-core
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core==1.12.0
+dbt-core==1.12.2
     # via
     #   -r requirements.in
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core-experimental-parser==2.0.0a5
+dbt-core-experimental-parser==2.0.0b1
     # via dbt-core
 dbt-duckdb==1.11.0
     # via -r requirements.in
@@ -234,6 +234,8 @@ notebook-shim==0.2.4
     # via jupyterlab
 numpy==2.4.6
     # via pandas
+opentelemetry-api==1.44.0
+    # via dbt-core
 orderly-set==5.5.0
     # via deepdiff
 packaging==26.2
@@ -415,6 +417,7 @@ typing-extensions==4.15.0
     #   dbt-core
     #   mashumaro
     #   metricflow
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   referencing
