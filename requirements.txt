@@ -369,7 +369,7 @@ snowplow-tracker==1.1.0
     # via dbt-core
 soupsieve==2.8.4
     # via beautifulsoup4
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
     # via -r requirements.in
 sqlglot==30.13.0
     # via metricflow
