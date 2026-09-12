@@ -37,6 +37,15 @@ x-r2-credentials: &r2-credentials |
     echo "R2 credentials missing: expected CLOUDFLARE_R2_ACCESS_KEY_ID and CLOUDFLARE_R2_SECRET_ACCESS_KEY in Doppler common/dev." >&2
     exit 1
   fi
+  # rclone reads ~/.config/rclone/rclone.conf by default; this repository keeps
+  # its own at the root, and the RCLONE_CONFIG env var that pointed at it lived
+  # in the retired CircleCI context. Without it rclone reports "didn't find
+  # section in config file".
+  export RCLONE_CONFIG="$$PWD/rclone.conf"
+  if [ ! -f "$$RCLONE_CONFIG" ]; then
+    echo "rclone.conf not found at $$RCLONE_CONFIG" >&2
+    exit 1
+  fi
 
 steps:
   - label: ":arrow_down: Download population data"
