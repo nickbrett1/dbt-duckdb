@@ -1,0 +1,76 @@
+# Ported from CircleCI's `download_transform_load` workflow: three steps, main
+# only, with the transform depending on both downloads.
+#
+# Two deliberate changes from the CircleCI jobs:
+#   * secrets are injected with `doppler run` at runtime (the repository's own
+#     npm scripts already work that way), replacing CircleCI's "context: common";
+#   * the toolchain install (rclone, sqlite3, jq, node, Doppler CLI, pip deps)
+#     lives in scripts/setup-toolchain.sh, because all three jobs installed it
+#     inline and identically.
+
+steps:
+  - label: ":arrow_down: Download population data"
+    key: download_population
+    if: build.branch == "main"
+    agents:
+      queue: mac-studio-linux
+    plugins:
+      - docker#v5.13.0:
+          image: "python:3.13-bookworm"
+          platform: linux/arm64
+          workdir: /workdir
+          environment:
+            - DOPPLER_TOKEN
+    commands:
+      - bash .buildkite/scripts/setup-toolchain.sh
+      - doppler run --project common --config dev -- python download_population.py
+
+  - label: ":arrow_down: Download WDI data"
+    key: download_wdi
+    if: build.branch == "main"
+    agents:
+      queue: mac-studio-linux
+    plugins:
+      - docker#v5.13.0:
+          image: "python:3.13-bookworm"
+          platform: linux/arm64
+          workdir: /workdir
+          environment:
+            - DOPPLER_TOKEN
+    commands:
+      - bash .buildkite/scripts/setup-toolchain.sh
+      - doppler run --project common --config dev -- python download_wdi.py
+
+  - label: ":bar_chart: Transform and load"
+    key: transform_and_load
+    depends_on:
+      - download_population
+      - download_wdi
+    if: build.branch == "main"
+    agents:
+      queue: mac-studio-linux
+    plugins:
+      - docker#v5.13.0:
+          image: "python:3.13-bookworm"
+          platform: linux/arm64
+          workdir: /workdir
+          environment:
+            - DOPPLER_TOKEN
+    commands:
+      - bash .buildkite/scripts/setup-toolchain.sh
+      # Populate the DuckDB database from the downloaded sources.
+      - doppler run --project common --config dev -- python populate.py --use-duckdb
+      # Build and document the dbt models.
+      - doppler run --project common --config dev -- bash -c 'cd wdi && dbt deps && dbt run --target prod && dbt docs generate --target prod'
+      - doppler run --project common --config dev -- rclone copy wdi/target/manifest.json r2:wdi/docs --checksum
+      - doppler run --project common --config dev -- rclone copy wdi/target/catalog.json r2:wdi/docs --checksum
+      - doppler run --project common --config dev -- rclone copy wdi/target/index.html r2:wdi/docs --checksum
+      # Export the marts as Parquet, sync what changed, then update D1.
+      - doppler run --project common --config dev -- python export_parquet.py export
+      - doppler run --project common --config dev -- python sync_remote_parquet.py export/exported_files.json changed_tables.json
+      - |
+        if [ -s changed_tables.json ]; then
+          doppler run --project common --config dev -- python update_d1.py changed_tables.json --remote
+        else
+          echo "No changes detected; skipping D1 update."
+        fi
