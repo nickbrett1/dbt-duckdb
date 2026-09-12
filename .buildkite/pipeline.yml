@@ -31,10 +31,10 @@ x-r2-credentials: &r2-credentials |
     apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
     curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh
   fi
-  export AWS_ACCESS_KEY_ID="$$(doppler secrets get WDI_RCLONE_ACCESS_KEY_ID --project common --config dev --plain)"
-  export AWS_SECRET_ACCESS_KEY="$$(doppler secrets get WDI_RCLONE_SECRET_ACCESS_KEY --project common --config dev --plain)"
+  export AWS_ACCESS_KEY_ID="$$(doppler secrets get CLOUDFLARE_R2_ACCESS_KEY_ID --project common --config dev --plain)"
+  export AWS_SECRET_ACCESS_KEY="$$(doppler secrets get CLOUDFLARE_R2_SECRET_ACCESS_KEY --project common --config dev --plain)"
   if [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ]; then
-    echo "R2 credentials missing: expected WDI_RCLONE_ACCESS_KEY_ID and WDI_RCLONE_SECRET_ACCESS_KEY in Doppler common/dev." >&2
+    echo "R2 credentials missing: expected CLOUDFLARE_R2_ACCESS_KEY_ID and CLOUDFLARE_R2_SECRET_ACCESS_KEY in Doppler common/dev." >&2
     exit 1
   fi
 
