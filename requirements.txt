@@ -277,7 +277,7 @@ psutil==7.2.2
     # via
     #   ipykernel
     #   ipython
-psycopg2-binary==2.9.12
+psycopg2-binary==2.9.13
     # via
     #   -r requirements.in
     #   dbt-postgres
