@@ -9,7 +9,9 @@
 	// Needed to work around https://github.com/microsoft/vscode-remote-release/issues/7029
 	"runArgs": [
 		"--sysctl",
-		"net.ipv6.conf.all.disable_ipv6=1"
+		"net.ipv6.conf.all.disable_ipv6=1",
+		"--stop-timeout",
+		"30"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// 5432 is the default port for PostgreSQL.
@@ -48,7 +50,8 @@
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-create-setup.sh" // Configure tool-specific properties.
+	"postCreateCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-create-setup.sh", // Configure tool-specific properties.
+	"postStartCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-start-setup.sh"
 	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
