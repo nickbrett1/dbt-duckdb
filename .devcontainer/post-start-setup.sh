@@ -6,6 +6,12 @@
 # The agent registers in the hub under the name "dbt-duckdb-dev"; scripts/agent-dev.sh is
 # app-owned, so regenerating this project never overwrites it.
 
+echo "INFO: Checking Tailscale status..."
+if ! pgrep -x tailscaled >/dev/null; then
+    echo "INFO: Tailscale daemon not running. Starting it..."
+    sudo start-stop-daemon --start --background --oknodo --pidfile /var/run/tailscaled.pid --make-pidfile --exec /usr/sbin/tailscaled -- --state=/var/lib/tailscale/tailscaled.state
+fi
+
 echo "INFO: Checking the container agent..."
 if [ -x "/workspaces/dbt-duckdb/scripts/agent-dev.sh" ]; then
     "/workspaces/dbt-duckdb/scripts/agent-dev.sh" start || true

@@ -11,7 +11,10 @@
 		"--sysctl",
 		"net.ipv6.conf.all.disable_ipv6=1",
 		"--stop-timeout",
-		"30"
+		"30",
+		"--cap-add",
+		"NET_ADMIN",
+		"--device=/dev/net/tun"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// 5432 is the default port for PostgreSQL.
@@ -50,6 +53,9 @@
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
+	"mounts": [
+	  "source=dbt-duckdb-tailscale-state,target=/var/lib/tailscale,type=volume"
+	],
 	"postCreateCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-create-setup.sh", // Configure tool-specific properties.
 	"postStartCommand": "bash /workspaces/dbt-duckdb/.devcontainer/post-start-setup.sh"
 	// "customizations": {},
