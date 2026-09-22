@@ -66,7 +66,7 @@ dbt-common==1.38.0
     #   dbt-core
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core==1.12.4
+dbt-core==1.12.5
     # via
     #   -r requirements.in
     #   dbt-duckdb
@@ -209,7 +209,7 @@ matplotlib-inline==0.2.2
     # via
     #   ipykernel
     #   ipython
-metricflow==0.211.0
+metricflow==0.213.0
     # via dbt-core
 mistune==3.2.1
     # via nbconvert
