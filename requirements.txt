@@ -102,8 +102,6 @@ fastjsonschema==2.21.2
     # via nbformat
 fqdn==1.5.1
     # via jsonschema
-greenlet==3.5.1
-    # via sqlalchemy
 h11==0.16.0
     # via httpcore
 httpcore==1.0.9
@@ -369,7 +367,7 @@ snowplow-tracker==1.1.0
     # via dbt-core
 soupsieve==2.8.4
     # via beautifulsoup4
-sqlalchemy==2.0.52
+sqlalchemy==2.1.1
     # via -r requirements.in
 sqlglot==30.13.0
     # via metricflow
