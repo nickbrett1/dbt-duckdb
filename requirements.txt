@@ -245,7 +245,7 @@ packaging==26.2
     #   jupyterlab
     #   jupyterlab-server
     #   nbconvert
-pandas==3.0.6
+pandas==3.1.0
     # via -r requirements.in
 pandocfilters==1.5.1
     # via nbconvert
