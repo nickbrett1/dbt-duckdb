@@ -66,12 +66,12 @@ dbt-common==1.38.0
     #   dbt-core
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core==1.12.6
+dbt-core==1.12.7
     # via
     #   -r requirements.in
     #   dbt-duckdb
     #   dbt-postgres
-dbt-core-experimental-parser==2.0.0b1
+dbt-core-experimental-parser==2.0.11
     # via dbt-core
 dbt-duckdb==1.11.0
     # via -r requirements.in
